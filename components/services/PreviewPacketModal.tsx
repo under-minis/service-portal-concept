@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -204,6 +203,9 @@ export function PreviewPacketModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl h-[90vh] flex flex-col bg-slate-900/95 backdrop-blur-xl border-slate-700/50 p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-700/50">
+          <DialogTitle className="sr-only">
+            Welcome Packet - Step {step} of 2
+          </DialogTitle>
           <StepIndicator
             currentStep={step}
             step1Complete={developerSent}
