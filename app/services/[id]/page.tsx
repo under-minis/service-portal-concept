@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft,
@@ -18,6 +19,12 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  Edit,
+  Save,
+  X,
+  Plus,
+  Trash2,
+  Mail,
 } from "lucide-react";
 import {
   Dialog,
@@ -32,24 +39,41 @@ import { getFieldRules } from "@/lib/services/fieldRules";
 import { generateWebhookPayload, generateEmailPayload } from "@/lib/services/payloadGenerator";
 import { CopyButton } from "@/components/services/CopyButton";
 import { formatCurrency } from "@/lib/utils/formatting";
+import type { Service } from "@/types/service";
+import { ServiceDetailsSidebar } from "@/components/services/ServiceDetailsSidebar";
 
 export default function ServiceDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const serviceId = params.id as string;
+  const [tempServices, setTempServices] = useState<Service[]>([]);
 
-  const [expandedSections, setExpandedSections] = useState({
-    webhooks: true,
-    emails: true,
-  });
+  // Load temporary services from sessionStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("tempServices");
+      if (stored) {
+        try {
+          setTempServices(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse tempServices from sessionStorage", e);
+        }
+      }
+    }
+  }, []);
 
   const [expandedDevSections, setExpandedDevSections] = useState({
-    apiEndpoint: true,
-    apiKeys: true,
-    requestBody: true,
-    fieldRules: true,
+    apiEndpoint: false,
+    apiKeys: false,
+    requestBody: false,
+    fieldRules: false,
     payloads: false,
   });
+
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedWebhooks, setEditedWebhooks] = useState<any[]>([]);
+  const [editedEmails, setEditedEmails] = useState<any[]>([]);
 
   const [selectedPayload, setSelectedPayload] = useState<{
     type: "webhook" | "email";
@@ -58,13 +82,6 @@ export default function ServiceDetailsPage() {
     email?: string;
   } | null>(null);
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
-
-  const toggleSection = (section: "webhooks" | "emails") => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
 
   const toggleDevSection = (
     section: "apiEndpoint" | "apiKeys" | "requestBody" | "fieldRules" | "payloads"
@@ -75,7 +92,22 @@ export default function ServiceDetailsPage() {
     }));
   };
 
-  const service = mockServices.find((s) => s.id === serviceId);
+  // Check both mockServices and tempServices
+  // Use useMemo to ensure service updates when tempServices changes
+  const service = useMemo(() => {
+    return (
+      mockServices.find((s) => s.id === serviceId) ||
+      tempServices.find((s) => s.id === serviceId)
+    );
+  }, [serviceId, tempServices]);
+
+  // Initialize editing state when service loads
+  useEffect(() => {
+    if (service) {
+      setEditedWebhooks(service.webhookConnections || []);
+      setEditedEmails(service.emailDestinations || []);
+    }
+  }, [service]);
 
 
   if (!service) {
@@ -119,19 +151,27 @@ export default function ServiceDetailsPage() {
       </div>
 
       <main className="relative min-h-screen container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-        <Button
-          variant="outline"
-          onClick={() => router.push("/")}
-            className="mb-6 border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Services
-        </Button>
+        <div className="flex gap-8">
+          {/* Sidebar Navigation */}
+          <aside className="hidden lg:block w-64 shrink-0">
+            <ServiceDetailsSidebar />
+          </aside>
 
-          {/* Service Header */}
-          <div className="mb-8">
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            {/* Header */}
+            <div className="mb-8">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/")}
+                className="mb-6 border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Services
+              </Button>
+
+              {/* Service Header */}
+              <div className="mb-8" id="overview">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
@@ -175,289 +215,382 @@ export default function ServiceDetailsPage() {
             </div>
           </div>
 
-          {/* Connections & Destinations - Collapsible */}
-          <Card className="mb-8 rounded-2xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/50">
+          {/* Connections & Destinations - Editable Form */}
+          <Card className="mb-8 rounded-2xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/50" id="connections">
             <CardHeader>
-              <CardTitle className="text-xl text-slate-200 flex items-center gap-2">
-                <Network className="h-5 w-5 text-cyan-400" />
-                Connections & Destinations
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Webhook Connections */}
-              <div className="border border-slate-700/50 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleSection("webhooks")}
-                  className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Network className="h-4 w-4 text-cyan-400" />
-                    <span className="font-semibold text-slate-200">
-                      Webhook Connections
-                    </span>
-                    {service.webhookConnections && service.webhookConnections.length > 0 && (
-                      <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30">
-                        {service.webhookConnections.length}
-                      </Badge>
-                    )}
-                  </div>
-                  {expandedSections.webhooks ? (
-                    <ChevronUp className="h-4 w-4 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                  )}
-                </button>
-                {expandedSections.webhooks && (
-                  <div className="p-4 border-t border-slate-700/50">
-                {service.webhookConnections &&
-                service.webhookConnections.length > 0 ? (
-                      <div className="space-y-4">
-                        {service.webhookConnections.map((webhook) => {
-                          return (
-                            <div
-                              key={webhook.id}
-                              className="p-5 rounded-lg bg-slate-950/50 border border-slate-700/30 hover:border-cyan-500/30 transition-all hover:shadow-lg hover:shadow-cyan-500/10"
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-lg text-slate-200">
-                                      {webhook.name}
-                                    </p>
-                                    <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30">
-                                      {webhook.id}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-sm text-cyan-400 font-mono break-all">
-                                    {webhook.url}
-                                  </p>
-                                </div>
-                              </div>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl text-slate-200 flex items-center gap-2">
+                  <Network className="h-5 w-5 text-cyan-400" />
+                  Connections & Destinations
+                </CardTitle>
+                {!isEditing && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditing(true)}
+                    className="border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-400"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+                {isEditing && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditedWebhooks(service.webhookConnections || []);
+                        setEditedEmails(service.emailDestinations || []);
+                      }}
+                      className="border-slate-700/50 hover:border-slate-600 text-slate-300"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        // Update both tempServices and onboardingFlowState for persistence
+                        if (typeof window !== "undefined") {
+                          // Update tempServices
+                          const stored = sessionStorage.getItem("tempServices");
+                          if (stored) {
+                            const services = JSON.parse(stored);
+                            const index = services.findIndex((s: Service) => s.id === service.id);
+                            if (index !== -1) {
+                              services[index] = {
+                                ...services[index],
+                                webhookConnections: editedWebhooks,
+                                emailDestinations: editedEmails,
+                              };
+                              sessionStorage.setItem("tempServices", JSON.stringify(services));
+                            }
+                          }
 
-                              {/* Token Service Configuration */}
-                              {webhook.tokenService && (
-                                <div className="mt-4 pt-4 border-t border-slate-700/50">
-                                  <div className="flex items-center gap-2 mb-4">
-                                    <Sparkles className="h-4 w-4 text-yellow-400" />
-                                    <span className="text-sm font-semibold text-slate-300">
-                                      Token Service Configuration
-                                    </span>
-                                    <Badge
-                                      className={
-                                        webhook.tokenService.type === "oauth"
-                                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
-                                          : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                      }
-                                    >
-                                      {webhook.tokenService.type === "oauth"
-                                        ? "OAuth 2.0"
-                                        : "Custom Token Service"}
-                                    </Badge>
-                                  </div>
-                                  
-                                  {webhook.tokenService.type === "oauth" &&
-                                    webhook.tokenService.oauthConfig && (
-                                      <div className="space-y-4 p-4 rounded-lg bg-slate-900/30 border border-slate-700/30">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div>
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Grant Type
-                                            </Label>
-                                            <p className="text-sm text-purple-300 font-semibold bg-slate-950/50 p-2 rounded border border-slate-700/30">
-                                              client_credentials
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Token URL
-                                            </Label>
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-sm text-cyan-300 font-mono break-all bg-slate-950/50 p-2 rounded border border-slate-700/30 flex-1">
-                                                {webhook.tokenService.oauthConfig.tokenUrl}
-                                              </p>
-                                              <CopyButton
-                                                text={webhook.tokenService.oauthConfig.tokenUrl}
-                                              />
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Client ID
-                                            </Label>
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-sm text-cyan-300 font-mono break-all bg-slate-950/50 p-2 rounded border border-slate-700/30 flex-1">
-                                                {webhook.tokenService.oauthConfig.clientId}
-                                              </p>
-                                              <CopyButton
-                                                text={webhook.tokenService.oauthConfig.clientId}
-                                              />
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Client Secret
-                                            </Label>
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-sm text-yellow-300 font-mono bg-slate-950/50 p-2 rounded border border-slate-700/30 flex-1">
-                                                {webhook.tokenService.oauthConfig.clientSecret}
-                                              </p>
-                                              <CopyButton
-                                                text={webhook.tokenService.oauthConfig.clientSecret}
-                                              />
-                                            </div>
-                                          </div>
-                                          {webhook.tokenService.oauthConfig.scope && (
-                                            <div>
-                                              <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                                Scope
-                                              </Label>
-                                              <p className="text-sm text-purple-300 font-mono bg-slate-950/50 p-2 rounded border border-slate-700/30">
-                                                {webhook.tokenService.oauthConfig.scope}
-                                              </p>
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div className="mt-4 pt-4 border-t border-slate-700/30">
-                                          <p className="text-xs text-slate-400 mb-2">
-                                            <strong className="text-slate-300">Usage:</strong> This token service is used to authenticate webhook requests. The system will automatically obtain an access token using these credentials via <code className="text-cyan-300">client_credentials</code> grant type, then include it in the <code className="text-cyan-300">Authorization: Bearer &lt;token&gt;</code> header when sending payloads to the webhook endpoint.
-                                          </p>
-                                        </div>
-                                      </div>
-                                    )}
-                                  
-                                  {webhook.tokenService.type === "custom" &&
-                                    webhook.tokenService.customConfig && (
-                                      <div className="space-y-4 p-4 rounded-lg bg-slate-900/30 border border-slate-700/30">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div className="md:col-span-2">
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Token Service URL
-                                            </Label>
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-sm text-cyan-300 font-mono break-all bg-slate-950/50 p-2 rounded border border-slate-700/30 flex-1">
-                                                {webhook.tokenService.customConfig.tokenServiceUrl}
-                                              </p>
-                                              <CopyButton
-                                                text={webhook.tokenService.customConfig.tokenServiceUrl}
-                                              />
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Header Name
-                                            </Label>
-                                            <p className="text-sm text-purple-300 font-mono bg-slate-950/50 p-2 rounded border border-slate-700/30">
-                                              {webhook.tokenService.customConfig.headerName}
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <Label className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
-                                              Client ID
-                                            </Label>
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-sm text-cyan-300 font-mono break-all bg-slate-950/50 p-2 rounded border border-slate-700/30 flex-1">
-                                                {webhook.tokenService.customConfig.clientId}
-                                              </p>
-                                              <CopyButton
-                                                text={webhook.tokenService.customConfig.clientId}
-                                              />
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <div className="mt-4 pt-4 border-t border-slate-700/30">
-                                          <p className="text-xs text-slate-400 mb-2">
-                                            <strong className="text-slate-300">Usage:</strong> The Client ID will be sent in the <code className="text-purple-300">{webhook.tokenService.customConfig.headerName}</code> header when requesting a token from the token service URL. The obtained token will then be used to authenticate webhook requests (typically in the <code className="text-cyan-300">Authorization</code> header).
-                                          </p>
-                                        </div>
-                                      </div>
-                                    )}
-                                </div>
-                              )}
-                              
-                              {!webhook.tokenService && (
-                                <div className="mt-4 pt-4 border-t border-slate-700/50">
-                                  <p className="text-xs text-slate-500 italic">
-                                    No token service configured. Webhook requests will be sent without authentication.
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                          // Update onboardingFlowState to persist changes to main page
+                          const flowState = sessionStorage.getItem("onboardingFlowState");
+                          if (flowState) {
+                            try {
+                              const state = JSON.parse(flowState);
+                              if (Array.isArray(state.services)) {
+                                const serviceIndex = state.services.findIndex(
+                                  (s: Service) => s.id === service.id
+                                );
+                                if (serviceIndex !== -1) {
+                                  state.services[serviceIndex] = {
+                                    ...state.services[serviceIndex],
+                                    webhookConnections: editedWebhooks,
+                                    emailDestinations: editedEmails,
+                                  };
+                                  sessionStorage.setItem(
+                                    "onboardingFlowState",
+                                    JSON.stringify(state)
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              console.error("Failed to update onboardingFlowState", e);
+                            }
+                          }
+                        }
+                        setIsEditing(false);
+                        // Update local state to reflect changes immediately
+                        // This will cause the service object (via useMemo) to recompute with new data
+                        setTempServices((prev) => {
+                          const updated = [...prev];
+                          const index = updated.findIndex((s) => s.id === service.id);
+                          if (index !== -1) {
+                            updated[index] = {
+                              ...updated[index],
+                              webhookConnections: editedWebhooks,
+                              emailDestinations: editedEmails,
+                            };
+                          }
+                          return updated;
+                        });
+                      }}
+                      className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white border-0"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </Button>
                   </div>
-                ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        No webhook connections configured
-                  </p>
                 )}
               </div>
-                )}
-            </div>
-
-              {/* Email Destinations */}
-              <div className="border border-slate-700/50 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleSection("emails")}
-                  className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
-                >
-                        <div className="flex items-center gap-2">
-                    <FileCode className="h-4 w-4 text-purple-400" />
-                    <span className="font-semibold text-slate-200">
-                      Email Destinations
-                    </span>
-                    {service.emailDestinations && service.emailDestinations.length > 0 && (
-                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
-                        {service.emailDestinations.length}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {isEditing ? (
+                <>
+                  {/* Webhook Connections Form */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-3" id="webhooks">
+                      <Network className="h-4 w-4 text-cyan-400" />
+                      <Label className="text-base font-semibold text-slate-200">
+                        Webhook Connections
+                      </Label>
+                      <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30">
+                        {editedWebhooks.length}
                       </Badge>
-                    )}
-                        </div>
-                  {expandedSections.emails ? (
-                    <ChevronUp className="h-4 w-4 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                  )}
-                </button>
-                {expandedSections.emails && (
-                  <div className="p-4 border-t border-slate-700/50">
-                    {service.emailDestinations &&
-                    service.emailDestinations.length > 0 ? (
-                      <div className="space-y-4">
-                        {service.emailDestinations.map((email) => (
-                          <div
-                            key={email.id}
-                            className="p-5 rounded-lg bg-slate-950/50 border border-slate-700/30 hover:border-purple-500/30 transition-all hover:shadow-lg hover:shadow-purple-500/10"
+                    </div>
+                    {editedWebhooks.map((webhook, index) => (
+                      <div
+                        key={webhook.id}
+                        className="p-4 rounded-lg bg-slate-950/50 border border-slate-700/30 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-slate-200">
+                            Webhook {index + 1}
+                          </Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditedWebhooks(editedWebhooks.filter((_, i) => i !== index));
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <p className="font-semibold text-lg text-slate-200 mb-1">
-                                  {email.name}
-                                </p>
-                                <p className="text-sm text-purple-400 font-mono break-all">
-                                  {email.email}
-                  </p>
-                </div>
-                              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
-                                {email.id}
-                    </Badge>
-                </div>
-                </div>
-                        ))}
-                </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        No email destinations configured
-                      </p>
-                    )}
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor={`webhook-name-${index}`} className="text-xs text-slate-400 mb-1 block">
+                              Name
+                            </Label>
+                            <Input
+                              id={`webhook-name-${index}`}
+                              value={webhook.name}
+                              onChange={(e) => {
+                                const updated = [...editedWebhooks];
+                                updated[index] = { ...updated[index], name: e.target.value };
+                                setEditedWebhooks(updated);
+                              }}
+                              className="bg-slate-900/50 border-slate-700/50 text-slate-100"
+                              placeholder="Webhook name"
+                            />
                           </div>
-                        )}
+                          <div>
+                            <Label htmlFor={`webhook-url-${index}`} className="text-xs text-slate-400 mb-1 block">
+                              URL <span className="text-red-400">*</span>
+                            </Label>
+                            <Input
+                              id={`webhook-url-${index}`}
+                              value={webhook.url}
+                              onChange={(e) => {
+                                const updated = [...editedWebhooks];
+                                updated[index] = { ...updated[index], url: e.target.value };
+                                setEditedWebhooks(updated);
+                              }}
+                              className="bg-slate-900/50 border-slate-700/50 text-slate-100 font-mono text-sm"
+                              placeholder="https://example.com/webhook"
+                              type="url"
+                            />
+                          </div>
+                        </div>
                       </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditedWebhooks([
+                          ...editedWebhooks,
+                          {
+                            id: `webhook-${Date.now()}`,
+                            name: "",
+                            url: "",
+                            createdAt: new Date().toISOString(),
+                          },
+                        ]);
+                      }}
+                      className="w-full border-dashed border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Webhook Connection
+                    </Button>
+                  </div>
 
-                    </CardContent>
-                  </Card>
+                  {/* Divider */}
+                  <div className="border-t border-slate-700/50 my-4" />
+
+                  {/* Email Destinations Form */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-3" id="emails">
+                      <Mail className="h-4 w-4 text-purple-400" />
+                      <Label className="text-base font-semibold text-slate-200">
+                        Email Destinations
+                      </Label>
+                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                        {editedEmails.length}
+                      </Badge>
+                    </div>
+                    {editedEmails.map((email, index) => (
+                      <div
+                        key={email.id}
+                        className="p-4 rounded-lg bg-slate-950/50 border border-slate-700/30 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-slate-200">
+                            Email {index + 1}
+                          </Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditedEmails(editedEmails.filter((_, i) => i !== index));
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor={`email-name-${index}`} className="text-xs text-slate-400 mb-1 block">
+                              Name
+                            </Label>
+                            <Input
+                              id={`email-name-${index}`}
+                              value={email.name}
+                              onChange={(e) => {
+                                const updated = [...editedEmails];
+                                updated[index] = { ...updated[index], name: e.target.value };
+                                setEditedEmails(updated);
+                              }}
+                              className="bg-slate-900/50 border-slate-700/50 text-slate-100"
+                              placeholder="Email destination name"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`email-address-${index}`} className="text-xs text-slate-400 mb-1 block">
+                              Email Address <span className="text-red-400">*</span>
+                            </Label>
+                            <Input
+                              id={`email-address-${index}`}
+                              value={email.email}
+                              onChange={(e) => {
+                                const updated = [...editedEmails];
+                                updated[index] = { ...updated[index], email: e.target.value };
+                                setEditedEmails(updated);
+                              }}
+                              className="bg-slate-900/50 border-slate-700/50 text-slate-100 font-mono text-sm"
+                              placeholder="recipient@example.com"
+                              type="email"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditedEmails([
+                          ...editedEmails,
+                          {
+                            id: `email-${Date.now()}`,
+                            name: "",
+                            email: "",
+                            createdAt: new Date().toISOString(),
+                          },
+                        ]);
+                      }}
+                      className="w-full border-dashed border-slate-700/50 hover:border-purple-500/50 hover:bg-purple-500/10 text-slate-400 hover:text-purple-400"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Email Destination
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* View Mode */}
+                  <div className="space-y-4">
+                    {/* Webhook Connections */}
+                    <div id="webhooks">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Network className="h-4 w-4 text-cyan-400" />
+                        <Label className="text-base font-semibold text-slate-200">
+                          Webhook Connections
+                        </Label>
+                        <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30">
+                          {service.webhookConnections?.length || 0}
+                        </Badge>
+                      </div>
+                      {service.webhookConnections && service.webhookConnections.length > 0 ? (
+                        <div className="space-y-2">
+                          {service.webhookConnections.map((webhook) => (
+                            <div
+                              key={webhook.id}
+                              className="p-3 rounded-lg bg-slate-950/50 border border-slate-700/30"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-slate-200">{webhook.name}</p>
+                                  <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 text-xs">
+                                    {webhook.id}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <p className="text-sm text-cyan-400 font-mono break-all mt-1">{webhook.url}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-3">
+                          No webhook connections configured
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="border-t border-slate-700/50 my-4" />
+
+                    {/* Email Destinations */}
+                    <div id="emails">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Mail className="h-4 w-4 text-purple-400" />
+                        <Label className="text-base font-semibold text-slate-200">
+                          Email Destinations
+                        </Label>
+                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                          {service.emailDestinations?.length || 0}
+                        </Badge>
+                      </div>
+                      {service.emailDestinations && service.emailDestinations.length > 0 ? (
+                        <div className="space-y-2">
+                          {service.emailDestinations.map((email) => (
+                            <div
+                              key={email.id}
+                              className="p-3 rounded-lg bg-slate-950/50 border border-slate-700/30"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-slate-200">{email.name}</p>
+                                  <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs">
+                                    {email.id}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <p className="text-sm text-purple-400 font-mono break-all mt-1">{email.email}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-3">
+                          No email destinations configured
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
                 </div>
 
         {/* Developer Tools Section */}
-        <Card className="mt-8 rounded-2xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/50">
+        <Card className="mt-8 rounded-2xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/50" id="developer-tools">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Terminal className="h-6 w-6 text-cyan-400" />
@@ -474,7 +607,7 @@ export default function ServiceDetailsPage() {
                 onClick={() => toggleDevSection("apiEndpoint")}
                 className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" id="api-endpoint">
                   <Code className="h-4 w-4 text-cyan-400" />
                   <span className="font-semibold text-slate-200">API Endpoint</span>
                       </div>
@@ -506,7 +639,7 @@ export default function ServiceDetailsPage() {
                   onClick={() => toggleDevSection("apiKeys")}
                   className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" id="api-keys">
                     <Sparkles className="h-4 w-4 text-yellow-400" />
                     <span className="font-semibold text-slate-200">API Keys</span>
                     <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
@@ -554,7 +687,7 @@ export default function ServiceDetailsPage() {
                 onClick={() => toggleDevSection("requestBody")}
                 className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" id="request-body">
                   <FileCode className="h-4 w-4 text-purple-400" />
                   <span className="font-semibold text-slate-200">Request Body</span>
                 </div>
@@ -598,7 +731,7 @@ export default function ServiceDetailsPage() {
                 onClick={() => toggleDevSection("fieldRules")}
                 className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
               >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2" id="field-rules">
                   <Code className="h-4 w-4 text-blue-400" />
                   <span className="font-semibold text-slate-200">Field Rules</span>
                   <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
@@ -673,7 +806,7 @@ export default function ServiceDetailsPage() {
                   onClick={() => toggleDevSection("payloads")}
                   className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-900/70 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" id="payloads">
                     <Network className="h-4 w-4 text-cyan-400" />
                     <span className="font-semibold text-slate-200">
                   Destination Payload Previews
@@ -790,6 +923,8 @@ export default function ServiceDetailsPage() {
             )}
           </CardContent>
         </Card>
+          </div>
+        </div>
       </main>
 
       {/* Payload Preview Modal */}

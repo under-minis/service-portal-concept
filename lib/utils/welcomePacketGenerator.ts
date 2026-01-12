@@ -23,14 +23,13 @@ export interface WelcomePacket {
 
 export function generateWelcomePacket(
   service: Service,
-  emailAddress: string,
   webhookUrl?: string
 ): WelcomePacket {
   const requestBody = generateRequestBody(service.workflowNames);
   const webhookPayload = webhookUrl
     ? generateWebhookPayload(service, webhookUrl)
     : generateWebhookPayload(service, "https://api.example.com/webhook");
-  const emailPayload = generateEmailPayload(service, emailAddress);
+  const emailPayload = generateEmailPayload(service, "");
   const fieldRules = getFieldRules(service.workflowNames);
 
   const developerGuideHtml = generateDeveloperGuide(

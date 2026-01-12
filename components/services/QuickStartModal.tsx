@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Mail, Sparkles } from "lucide-react";
+import { Zap, Sparkles } from "lucide-react";
 import { mockWorkflows } from "@/data/mockWorkflows";
 import { formatCurrency } from "@/lib/utils/formatting";
 import { calculateCostPerRun } from "@/lib/utils/costCalculation";
@@ -21,7 +21,7 @@ import { calculateCostPerRun } from "@/lib/utils/costCalculation";
 interface QuickStartModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (serviceName: string, email: string) => void;
+  onCreate: (serviceName: string) => void;
   isCreating?: boolean;
 }
 
@@ -34,8 +34,6 @@ export function QuickStartModal({
   isCreating = false,
 }: QuickStartModalProps) {
   const [serviceName, setServiceName] = useState("");
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState("");
 
   const selectedWorkflows = DEFAULT_WORKFLOWS;
   const calculatedCost = calculateCostPerRun(selectedWorkflows.length);
@@ -43,49 +41,27 @@ export function QuickStartModal({
     .filter((wf) => selectedWorkflows.includes(wf.id))
     .map((wf) => wf.name);
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleEmailChange = (value: string) => {
-    setEmail(value);
-    if (value && !validateEmail(value)) {
-      setEmailError("Please enter a valid email address");
-    } else {
-      setEmailError("");
-    }
-  };
-
   const handleCreate = () => {
     if (!serviceName.trim()) {
       return;
     }
-    if (!email.trim()) {
-      setEmailError("Email address is required");
-      return;
-    }
-    if (!validateEmail(email)) {
-      setEmailError("Please enter a valid email address");
-      return;
-    }
 
-    onCreate(serviceName.trim(), email.trim());
+    onCreate(serviceName.trim());
   };
 
-  const handleClose = () => {
+  const handleClose = (open: boolean) => {
     if (!isCreating) {
-      setServiceName("");
-      setEmail("");
-      setEmailError("");
-      onOpenChange(false);
+      if (!open) {
+        setServiceName("");
+      }
+      onOpenChange(open);
     }
   };
 
-  const isFormValid = serviceName.trim().length > 0 && email.trim().length > 0 && !emailError;
+  const isFormValid = serviceName.trim().length > 0;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={(open) => handleClose(open)}>
       <DialogContent className="max-w-2xl bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
@@ -95,7 +71,8 @@ export function QuickStartModal({
             </DialogTitle>
           </div>
           <DialogDescription className="text-slate-400">
-            Create your first service in minutes. We'll send you a complete welcome packet with everything you need.
+            Create your first service in minutes. We&apos;ll send you a complete
+            welcome packet with everything you need.
           </DialogDescription>
         </DialogHeader>
 
@@ -118,31 +95,6 @@ export function QuickStartModal({
             </p>
           </div>
 
-          {/* Email - Required */}
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-slate-300 flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Email Address <span className="text-red-400">*</span>
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="your.email@example.com"
-              value={email}
-              onChange={(e) => handleEmailChange(e.target.value)}
-              className={`bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100 ${
-                emailError ? "border-red-500/50" : ""
-              }`}
-              disabled={isCreating}
-            />
-            {emailError && (
-              <p className="text-xs text-red-400">{emailError}</p>
-            )}
-            <p className="text-xs text-slate-500">
-              We'll send your welcome packet with developer guide, examples, and team resources to this address
-            </p>
-          </div>
-
           {/* Pre-selected Workflows */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -161,7 +113,8 @@ export function QuickStartModal({
                 ))}
               </div>
               <p className="text-xs text-slate-500">
-                These workflows are pre-selected for quick start. You can add more later.
+                These workflows are pre-selected for quick start. You can add
+                more later.
               </p>
             </div>
           </div>
@@ -170,7 +123,9 @@ export function QuickStartModal({
           <div className="p-4 rounded-lg bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Estimated Cost per Run</p>
+                <p className="text-sm text-slate-400 mb-1">
+                  Estimated Cost per Run
+                </p>
                 <p className="text-2xl font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
                   {formatCurrency(calculatedCost)}
                 </p>
@@ -188,7 +143,7 @@ export function QuickStartModal({
         <DialogFooter className="gap-2">
           <Button
             variant="outline"
-            onClick={handleClose}
+            onClick={() => handleClose(false)}
             disabled={isCreating}
             className="border-slate-700/50 hover:border-slate-600 text-slate-300"
           >
@@ -204,7 +159,7 @@ export function QuickStartModal({
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Create & Generate Preview
+                Create
               </>
             )}
           </Button>
@@ -213,4 +168,3 @@ export function QuickStartModal({
     </Dialog>
   );
 }
-

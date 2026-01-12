@@ -10,18 +10,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Play, CheckCircle2, XCircle, Loader2, Eye } from "lucide-react";
+import { Play, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import type { Service } from "@/types/service";
 import { generateRequestBody } from "@/lib/services/requestBodyGenerator";
+import type { Event } from "./EventStream";
 
 interface TestRunnerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   service: Service;
-  onViewDetails?: () => void;
+  onEvent?: (
+    type: Event["type"],
+    message: string,
+    details?: string,
+    data?: Record<string, unknown>
+  ) => void;
+  onDone?: () => void;
 }
 
 type TestStatus = "idle" | "running" | "success" | "error";
@@ -30,7 +36,8 @@ export function TestRunner({
   open,
   onOpenChange,
   service,
-  onViewDetails,
+  onEvent,
+  onDone,
 }: TestRunnerProps) {
   const [testData, setTestData] = useState<Record<string, unknown>>(() => {
     const defaultBody = generateRequestBody(service.workflowNames);
@@ -43,8 +50,25 @@ export function TestRunner({
     setStatus("running");
     setResult(null);
 
+    onEvent?.(
+      "progress",
+      `Starting test run for "${service.name}"...`,
+      `Service ID: ${service.id}`
+    );
+    onEvent?.(
+      "info",
+      "Preparing test data",
+      `Workflows: ${service.workflowNames.join(", ")}`
+    );
+
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    onEvent?.(
+      "info",
+      "Executing workflows",
+      "Processing email and phone verification"
+    );
 
     // Mock success response
     const mockResult = {
@@ -62,6 +86,16 @@ export function TestRunner({
 
     setResult(mockResult);
     setStatus("success");
+    onEvent?.(
+      "success",
+      `Test run completed successfully for "${service.name}"`,
+      "All workflows executed successfully",
+      {
+        serviceId: service.id,
+        workflows: service.workflowNames,
+        result: mockResult,
+      }
+    );
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -132,7 +166,9 @@ export function TestRunner({
               <div className="flex items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
                 <CheckCircle2 className="h-6 w-6 text-green-400" />
                 <div>
-                  <h3 className="font-semibold text-green-400">Test Completed Successfully</h3>
+                  <h3 className="font-semibold text-green-400">
+                    Test Completed Successfully
+                  </h3>
                   <p className="text-sm text-slate-400">
                     All workflows executed successfully
                   </p>
@@ -140,7 +176,9 @@ export function TestRunner({
               </div>
 
               <div>
-                <Label className="text-slate-300 mb-2 block">Test Results</Label>
+                <Label className="text-slate-300 mb-2 block">
+                  Test Results
+                </Label>
                 <div className="p-4 rounded-lg bg-slate-950 border border-slate-700/50">
                   <pre className="text-sm text-slate-300 font-mono overflow-x-auto">
                     <code>{JSON.stringify(result, null, 2)}</code>
@@ -156,12 +194,14 @@ export function TestRunner({
                   <li>Service processed your test data</li>
                   <li>All workflows executed successfully</li>
                   <li>Results are ready for review</li>
-                  {service.emailDestinations && service.emailDestinations.length > 0 && (
-                    <li>Email sent to configured destinations</li>
-                  )}
-                  {service.webhookConnections && service.webhookConnections.length > 0 && (
-                    <li>Webhook payloads sent to configured endpoints</li>
-                  )}
+                  {service.emailDestinations &&
+                    service.emailDestinations.length > 0 && (
+                      <li>Email sent to configured destinations</li>
+                    )}
+                  {service.webhookConnections &&
+                    service.webhookConnections.length > 0 && (
+                      <li>Webhook payloads sent to configured endpoints</li>
+                    )}
                 </ul>
               </div>
             </div>
@@ -208,18 +248,11 @@ export function TestRunner({
               >
                 Run Another Test
               </Button>
-              {onViewDetails && (
-                <Button
-                  variant="outline"
-                  onClick={onViewDetails}
-                  className="border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Service Details
-                </Button>
-              )}
               <Button
-                onClick={() => onOpenChange(false)}
+                onClick={() => {
+                  onOpenChange(false);
+                  onDone?.();
+                }}
                 className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white border-0"
               >
                 Done
@@ -249,4 +282,3 @@ export function TestRunner({
     </Dialog>
   );
 }
-
