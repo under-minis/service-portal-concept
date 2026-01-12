@@ -5,21 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verification Report - rec-12349</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             max-width: 1000px;
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 0;
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
             color: #e2e8f0;
             min-height: 100vh;
             position: relative;
+            overflow-x: hidden;
         }
+        
+        /* Animated Background Grid */
         body::before {
             content: '';
             position: fixed;
@@ -32,9 +38,11 @@
                 linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px);
             background-size: 50px 50px;
             opacity: 0.2;
-            pointer-events: none;
             z-index: 0;
+            pointer-events: none;
         }
+        
+        /* Gradient Orbs */
         body::after {
             content: '';
             position: fixed;
@@ -44,97 +52,129 @@
             height: 400px;
             background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
             border-radius: 50%;
-            filter: blur(80px);
-            pointer-events: none;
+            filter: blur(60px);
             z-index: 0;
+            pointer-events: none;
             animation: pulse 4s ease-in-out infinite;
         }
+        
         @keyframes pulse {
             0%, 100% { opacity: 0.3; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(1.1); }
         }
+        
         .container {
             position: relative;
             z-index: 1;
+            padding: 40px 30px;
         }
+        
         .header {
-            background: rgba(30, 41, 59, 0.6);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 16px;
-            padding: 32px;
-            margin-bottom: 32px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-        .header h1 {
-            margin: 0 0 20px 0;
-            font-size: 36px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 50%, #a855f7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .header .meta {
-            color: #94a3b8;
-            font-size: 14px;
-            line-height: 1.8;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-        }
-        .header .meta strong {
-            color: #cbd5e1;
-            font-weight: 600;
-        }
-        .header .meta span {
-            color: #22d3ee;
-            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-        }
-        .section {
-            margin-bottom: 32px;
             background: rgba(30, 41, 59, 0.4);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
+        
+        .header h1 {
+            margin: 0 0 20px 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+        
+        .header .meta {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .meta-item {
+            padding: 12px 16px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 10px;
+        }
+        
+        .meta-item strong {
+            display: block;
+            color: #64748b;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        
+        .meta-item span {
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .meta-item .highlight {
+            color: #06b6d4;
+        }
+        
+        .section {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
         .section h2 {
             color: #e2e8f0;
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
             border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
+        
         .section h2::before {
             content: '';
             width: 4px;
             height: 24px;
-            background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
             border-radius: 2px;
         }
+        
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 2fr;
-            gap: 16px;
-            margin-bottom: 16px;
+            gap: 15px;
+            margin-bottom: 15px;
         }
+        
         .info-label {
-            font-weight: 600;
+            font-weight: 500;
             color: #94a3b8;
             font-size: 14px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.05em;
         }
+        
         .info-value {
             color: #e2e8f0;
             font-size: 15px;
         }
+        
         .status {
             display: inline-block;
             padding: 6px 16px;
@@ -142,69 +182,85 @@
             font-weight: 600;
             font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.05em;
             border: 1px solid;
         }
+        
         .status.verified {
-            background: linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
-            color: #22d3ee;
-            border-color: rgba(34, 211, 238, 0.3);
-            box-shadow: 0 0 12px rgba(34, 211, 238, 0.2);
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border-color: rgba(34, 197, 94, 0.3);
         }
+        
         .status.pending {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+            background: rgba(251, 191, 36, 0.15);
             color: #fbbf24;
             border-color: rgba(251, 191, 36, 0.3);
-            box-shadow: 0 0 12px rgba(251, 191, 36, 0.2);
         }
+        
         .status.failed {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
-            color: #ef4444;
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
             border-color: rgba(239, 68, 68, 0.3);
-            box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
         }
+        
         .workflow-item {
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(148, 163, 184, 0.15);
             padding: 20px;
             border-radius: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 15px;
             transition: all 0.3s ease;
         }
+        
         .workflow-item:hover {
-            border-color: rgba(34, 211, 238, 0.4);
-            box-shadow: 0 4px 16px rgba(34, 211, 238, 0.1);
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: 0 4px 20px rgba(6, 182, 212, 0.1);
             transform: translateY(-2px);
         }
+        
         .workflow-item h3 {
-            margin: 0 0 16px 0;
-            color: #e2e8f0;
-            font-size: 18px;
+            margin: 0 0 15px 0;
+            color: #06b6d4;
+            font-size: 1.1rem;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        
+        .workflow-item h3::before {
+            content: '⚡';
+            font-size: 1.2rem;
+        }
+        
         .timestamp {
             color: #64748b;
             font-size: 12px;
-            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-family: 'Courier New', monospace;
         }
+        
         .tags {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
         }
+        
         .tag {
-            background: linear-gradient(135deg, rgba(34, 211, 238, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%);
-            color: #22d3ee;
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
+            color: #06b6d4;
             padding: 6px 12px;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 12px;
             font-weight: 500;
-            border: 1px solid rgba(34, 211, 238, 0.3);
+            border: 1px solid rgba(6, 182, 212, 0.3);
         }
+        
         .reasons ul {
             list-style: none;
             padding: 0;
         }
+        
         .reasons li {
             padding: 12px 0;
             padding-left: 24px;
@@ -212,48 +268,62 @@
             color: #cbd5e1;
             line-height: 1.6;
         }
+        
         .reasons li::before {
             content: '✓';
             position: absolute;
             left: 0;
-            color: #22d3ee;
+            color: #4ade80;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 1.2rem;
         }
+        
         .reasons li:not(:last-child) {
             border-bottom: 1px solid rgba(148, 163, 184, 0.1);
         }
+        
         .footer {
-            margin-top: 48px;
-            padding-top: 24px;
-            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            margin-top: 50px;
+            padding: 30px;
             text-align: center;
             color: #64748b;
             font-size: 12px;
-            background: rgba(30, 41, 59, 0.4);
+            background: rgba(15, 23, 42, 0.4);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 16px;
-            padding: 24px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 20px;
         }
+        
         .footer p {
-            margin: 8px 0;
+            margin: 5px 0;
         }
-        .footer strong {
-            color: #94a3b8;
+        
+        .footer .report-id {
+            color: #06b6d4;
+            font-family: 'Courier New', monospace;
         }
+        
         @media print {
             body {
                 background: #ffffff;
                 color: #000000;
             }
-            .section {
-                background: #f8f9fa;
-                border: 1px solid #dee2e6;
+            
+            body::before,
+            body::after {
+                display: none;
             }
+            
+            .section,
             .header {
                 background: #ffffff;
-                border: 1px solid #dee2e6;
+                border: 1px solid #e2e8f0;
+                box-shadow: none;
+            }
+            
+            .section h2,
+            .header h1 {
+                color: #000000;
             }
         }
     </style>
@@ -263,36 +333,48 @@
         <div class="header">
             <h1>Verification Report</h1>
             <div class="meta">
-                <div><strong>Record ID:</strong> <span>rec-12349</span></div>
-                <div><strong>Request ID:</strong> <span>req-abc127</span></div>
-                <div><strong>Generated:</strong> <span>March 15, 2024 at 2:00 PM UTC</span></div>
-                <div><strong>Service:</strong> <span>User Verification Service (svc-001)</span></div>
+                <div class="meta-item">
+                    <strong>Record ID</strong>
+                    <span class="highlight">rec-12349</span>
+                </div>
+                <div class="meta-item">
+                    <strong>Request ID</strong>
+                    <span class="highlight">req-abc127</span>
+                </div>
+                <div class="meta-item">
+                    <strong>Generated</strong>
+                    <span>March 15, 2024 at 2:00 PM UTC</span>
+                </div>
+                <div class="meta-item">
+                    <strong>Service</strong>
+                    <span>User Verification Service (svc-001)</span>
+                </div>
             </div>
         </div>
 
         <div class="section">
             <h2>Verification Summary</h2>
             <div class="info-grid">
-                <div class="info-label">Overall Status:</div>
+                <div class="info-label">Overall Status</div>
                 <div class="info-value">
                     <span class="status verified">VERIFIED</span>
                 </div>
-                <div class="info-label">Verification Score:</div>
-                <div class="info-value" style="color: #22d3ee; font-weight: 600; font-size: 18px;">95/100</div>
-                <div class="info-label">Confidence Level:</div>
-                <div class="info-value" style="color: #3b82f6; font-weight: 600;">High</div>
+                <div class="info-label">Verification Score</div>
+                <div class="info-value" style="color: #4ade80; font-weight: 600; font-size: 1.2rem;">95/100</div>
+                <div class="info-label">Confidence Level</div>
+                <div class="info-value" style="color: #06b6d4; font-weight: 600;">High</div>
             </div>
         </div>
 
         <div class="section">
             <h2>Subject Information</h2>
             <div class="info-grid">
-                <div class="info-label">Email Address:</div>
-                <div class="info-value" style="font-family: 'Monaco', 'Menlo', 'Courier New', monospace; color: #22d3ee;">user@example.com</div>
-                <div class="info-label">Phone Number:</div>
-                <div class="info-value" style="font-family: 'Monaco', 'Menlo', 'Courier New', monospace; color: #3b82f6;">+1 (555) 123-4567</div>
-                <div class="info-label">Name:</div>
-                <div class="info-value" style="color: #e2e8f0; font-weight: 500;">John Doe</div>
+                <div class="info-label">Email Address</div>
+                <div class="info-value" style="font-family: 'Courier New', monospace; color: #06b6d4;">user@example.com</div>
+                <div class="info-label">Phone Number</div>
+                <div class="info-value" style="font-family: 'Courier New', monospace; color: #06b6d4;">+1 (555) 123-4567</div>
+                <div class="info-label">Name</div>
+                <div class="info-value">John Doe</div>
             </div>
         </div>
 
@@ -302,13 +384,13 @@
             <div class="workflow-item">
                 <h3>Email Verification</h3>
                 <div class="info-grid">
-                    <div class="info-label">Status:</div>
+                    <div class="info-label">Status</div>
                     <div class="info-value">
                         <span class="status verified">VERIFIED</span>
                     </div>
-                    <div class="info-label">Result:</div>
-                    <div class="info-value">Email address is valid and active</div>
-                    <div class="info-label">Completed:</div>
+                    <div class="info-label">Result</div>
+                    <div class="info-value" style="color: #cbd5e1;">Email address is valid and active</div>
+                    <div class="info-label">Completed</div>
                     <div class="info-value timestamp">2024-03-15 14:00:15 UTC</div>
                 </div>
             </div>
@@ -316,13 +398,13 @@
             <div class="workflow-item">
                 <h3>Phone Verification</h3>
                 <div class="info-grid">
-                    <div class="info-label">Status:</div>
+                    <div class="info-label">Status</div>
                     <div class="info-value">
                         <span class="status verified">VERIFIED</span>
                     </div>
-                    <div class="info-label">Result:</div>
-                    <div class="info-value">Phone number is valid and reachable</div>
-                    <div class="info-label">Completed:</div>
+                    <div class="info-label">Result</div>
+                    <div class="info-value" style="color: #cbd5e1;">Phone number is valid and reachable</div>
+                    <div class="info-label">Completed</div>
                     <div class="info-value timestamp">2024-03-15 14:00:32 UTC</div>
                 </div>
             </div>
@@ -330,13 +412,13 @@
             <div class="workflow-item">
                 <h3>ID Check</h3>
                 <div class="info-grid">
-                    <div class="info-label">Status:</div>
+                    <div class="info-label">Status</div>
                     <div class="info-value">
                         <span class="status verified">VERIFIED</span>
                     </div>
-                    <div class="info-label">Result:</div>
-                    <div class="info-value">Government-issued ID validated successfully</div>
-                    <div class="info-label">Completed:</div>
+                    <div class="info-label">Result</div>
+                    <div class="info-value" style="color: #cbd5e1;">Government-issued ID validated successfully</div>
+                    <div class="info-label">Completed</div>
                     <div class="info-value timestamp">2024-03-15 14:00:48 UTC</div>
                 </div>
             </div>
@@ -363,8 +445,8 @@
         </div>
 
         <div class="footer">
-            <p>This report was automatically generated by the <strong>Service Management Portal</strong></p>
-            <p><strong>Report ID:</strong> evt-005 | <strong>Service ID:</strong> svc-001</p>
+            <p>This report was automatically generated by the Service Management Portal</p>
+            <p>Report ID: <span class="report-id">evt-005</span> | Service ID: <span class="report-id">svc-001</span></p>
         </div>
     </div>
 </body>
