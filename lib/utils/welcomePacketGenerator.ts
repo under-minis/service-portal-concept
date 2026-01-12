@@ -1,6 +1,9 @@
 import type { Service } from "@/types/service";
 import { generateRequestBody } from "@/lib/services/requestBodyGenerator";
-import { generateWebhookPayload, generateEmailPayload } from "@/lib/services/payloadGenerator";
+import {
+  generateWebhookPayload,
+  generateEmailPayload,
+} from "@/lib/services/payloadGenerator";
 import { getFieldRules } from "@/lib/services/fieldRules";
 import { formatCurrency } from "@/lib/utils/formatting";
 
@@ -12,7 +15,7 @@ export interface WelcomePacket {
   emailPayloadJson: string;
   successExampleJson: string;
   failureExampleJson: string;
-  
+
   // Ops team files
   opsWelcomeGuideHtml: string;
   quickStartChecklistHtml: string;
@@ -37,11 +40,21 @@ export function generateWelcomePacket(
     emailPayload,
     fieldRules
   );
-  
+
   const opsWelcomeGuideHtml = generateOpsWelcomeGuide(service);
   const quickStartChecklistHtml = generateQuickStartChecklist(service);
-  const successExample = generateSuccessExample(service, requestBody, webhookPayload, emailPayload);
-  const failureExample = generateFailureExample(service, requestBody, webhookPayload, emailPayload);
+  const successExample = generateSuccessExample(
+    service,
+    requestBody,
+    webhookPayload,
+    emailPayload
+  );
+  const failureExample = generateFailureExample(
+    service,
+    requestBody,
+    webhookPayload,
+    emailPayload
+  );
 
   return {
     developerGuideHtml,
@@ -60,7 +73,13 @@ function generateDeveloperGuide(
   requestBody: Record<string, unknown>,
   webhookPayload: Record<string, unknown>,
   emailPayload: Record<string, unknown>,
-  fieldRules: Array<{ field: string; description: string; required: boolean; type?: string; examples?: string[] }>
+  fieldRules: Array<{
+    field: string;
+    description: string;
+    required: boolean;
+    type?: string;
+    examples?: string[];
+  }>
 ): string {
   const apiEndpoint = `https://api.example.com/v1/services/${service.id}/process`;
   const timestamp = new Date().toISOString();
@@ -257,7 +276,11 @@ function generateDeveloperGuide(
 
         <h3>Active Workflows</h3>
         <ul style="list-style: none; padding: 0;">
-          ${service.workflowNames.map(wf => `<li style="padding: 8px 0; color: #475569;">• ${wf}</li>`).join('')}
+          ${service.workflowNames
+            .map(
+              (wf) => `<li style="padding: 8px 0; color: #475569;">• ${wf}</li>`
+            )
+            .join("")}
         </ul>
       </section>
 
@@ -283,23 +306,36 @@ function generateDeveloperGuide(
             </tr>
           </thead>
           <tbody>
-            ${fieldRules.map(rule => `
+            ${fieldRules
+              .map(
+                (rule) => `
               <tr>
                 <td><code>${rule.field}</code></td>
-                <td>${rule.type || 'N/A'}</td>
+                <td>${rule.type || "N/A"}</td>
                 <td>
-                  ${rule.required 
-                    ? '<span class="badge badge-required">Required</span>' 
-                    : '<span class="badge badge-optional">Optional</span>'}
+                  ${
+                    rule.required
+                      ? '<span class="badge badge-required">Required</span>'
+                      : '<span class="badge badge-optional">Optional</span>'
+                  }
                 </td>
                 <td>${rule.description}</td>
                 <td>
-                  ${rule.examples && rule.examples.length > 0
-                    ? rule.examples.map(ex => `<code style="display: block; margin: 2px 0;">${ex}</code>`).join('')
-                    : 'N/A'}
+                  ${
+                    rule.examples && rule.examples.length > 0
+                      ? rule.examples
+                          .map(
+                            (ex) =>
+                              `<code style="display: block; margin: 2px 0;">${ex}</code>`
+                          )
+                          .join("")
+                      : "N/A"
+                  }
                 </td>
               </tr>
-            `).join('')}
+            `
+              )
+              .join("")}
           </tbody>
         </table>
       </section>
@@ -489,10 +525,12 @@ function generateOpsWelcomeGuide(service: Service): string {
         <h2>What This Service Does</h2>
         <div class="info-box">
           <p style="color: #475569; margin-bottom: 10px;">
-            Your service <strong>${service.name}</strong> (ID: <code>${service.id}</code>) automatically verifies and processes data using these workflows:
+            Your service <strong>${service.name}</strong> (ID: <code>${
+    service.id
+  }</code>) automatically verifies and processes data using these workflows:
           </p>
           <ul>
-            ${service.workflowNames.map(wf => `<li>${wf}</li>`).join('')}
+            ${service.workflowNames.map((wf) => `<li>${wf}</li>`).join("")}
           </ul>
         </div>
         <p style="color: #64748b;">
@@ -505,7 +543,9 @@ function generateOpsWelcomeGuide(service: Service): string {
         <div class="highlight">
           <ol style="margin-left: 20px;">
             <li style="margin-bottom: 10px;"><strong>Go to the Service Network portal</strong> - You're already there!</li>
-            <li style="margin-bottom: 10px;"><strong>Click on your service</strong> - Find "${service.name}" in the services list</li>
+            <li style="margin-bottom: 10px;"><strong>Click on your service</strong> - Find "${
+              service.name
+            }" in the services list</li>
             <li style="margin-bottom: 10px;"><strong>Use the Test Runner</strong> - Click "Run Your First Test" to try it out</li>
             <li style="margin-bottom: 10px;"><strong>Review the results</strong> - See what happens when your service processes data</li>
           </ol>
@@ -744,7 +784,8 @@ function generateSuccessExample(
   emailPayload: Record<string, unknown>
 ): Record<string, unknown> {
   return {
-    description: "Complete success scenario - all workflows completed successfully",
+    description:
+      "Complete success scenario - all workflows completed successfully",
     request: {
       ...requestBody,
       recordId: "rec-success-12345",
@@ -783,15 +824,20 @@ function generateSuccessExample(
     emailPayload: {
       ...emailPayload,
       metadata: {
-        ...emailPayload.metadata,
+        ...(emailPayload.metadata && typeof emailPayload.metadata === "object"
+          ? (emailPayload.metadata as Record<string, unknown>)
+          : {}),
         status: "completed",
         recordId: "rec-success-12345",
       },
     },
     whatThisMeans: {
-      summary: "All workflows completed successfully. Your data was verified and processed correctly.",
-      whatToExpect: "You'll receive webhook/email notifications with complete results. All verification steps passed.",
-      nextSteps: "Process the successful response in your application. The data is ready to use.",
+      summary:
+        "All workflows completed successfully. Your data was verified and processed correctly.",
+      whatToExpect:
+        "You'll receive webhook/email notifications with complete results. All verification steps passed.",
+      nextSteps:
+        "Process the successful response in your application. The data is ready to use.",
     },
   };
 }
@@ -826,7 +872,8 @@ function generateFailureExample(
   };
 
   return {
-    description: "Failure scenario - validation errors due to invalid input data",
+    description:
+      "Failure scenario - validation errors due to invalid input data",
     request: invalidRequestBody,
     response: {
       status: "failed",
@@ -851,18 +898,29 @@ function generateFailureExample(
       ...emailPayload,
       subject: `Service Error - ${service.name}`,
       body: {
-        text: `Service ${service.id} encountered an error during processing.\n\nError: ${errorDetails.message}\n\nDetails: ${JSON.stringify(errorDetails.details, null, 2)}`,
-        html: `<h1>Service Error</h1><p>Service <strong>${service.id}</strong> encountered an error during processing.</p><p><strong>Error:</strong> ${errorDetails.message}</p><pre>${JSON.stringify(errorDetails.details, null, 2)}</pre>`,
+        text: `Service ${
+          service.id
+        } encountered an error during processing.\n\nError: ${
+          errorDetails.message
+        }\n\nDetails: ${JSON.stringify(errorDetails.details, null, 2)}`,
+        html: `<h1>Service Error</h1><p>Service <strong>${
+          service.id
+        }</strong> encountered an error during processing.</p><p><strong>Error:</strong> ${
+          errorDetails.message
+        }</p><pre>${JSON.stringify(errorDetails.details, null, 2)}</pre>`,
       },
       metadata: {
-        ...emailPayload.metadata,
+        ...(emailPayload.metadata && typeof emailPayload.metadata === "object"
+          ? (emailPayload.metadata as Record<string, unknown>)
+          : {}),
         status: "failed",
         recordId: "rec-failure-12345",
         error: errorDetails,
       },
     },
     whatThisMeans: {
-      summary: "One or more workflows failed. This is usually due to invalid data format or missing required fields.",
+      summary:
+        "One or more workflows failed. This is usually due to invalid data format or missing required fields.",
       commonCauses: [
         "Invalid email format (must be user@domain.com)",
         "Missing country code in phone number (must include +1234567890)",
@@ -875,7 +933,8 @@ function generateFailureExample(
         "Retry the request with corrected data",
         "Check the field rules in the developer guide for format requirements",
       ],
-      whenToRetry: "If it's a data validation error, fix and retry immediately. If it's a service error, wait a moment and retry. Check service status if failures persist.",
+      whenToRetry:
+        "If it's a data validation error, fix and retry immediately. If it's a service error, wait a moment and retry. Check service status if failures persist.",
     },
     howToFix: [
       "Ensure email is in valid format: user@domain.com",
@@ -886,4 +945,3 @@ function generateFailureExample(
     ],
   };
 }
-
