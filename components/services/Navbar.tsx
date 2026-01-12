@@ -9,7 +9,7 @@ export function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-xl">
+    <nav className="sticky top-0 z-50 border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-cyan-400" />

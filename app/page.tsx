@@ -276,7 +276,7 @@ function HomeContent() {
     setIsPreviewPacketOpen(true);
   };
 
-  const handleSendPreviewPacket = async () => {
+  const handleSendDeveloperPacket = async (email: string) => {
     if (!welcomePacket || !newlyCreatedService) {
       return;
     }
@@ -290,12 +290,11 @@ function HomeContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          to: previewEmail,
+          to: email,
           serviceName: newlyCreatedService.name,
           serviceId: newlyCreatedService.id,
+          packetType: "developer",
           developerGuideHtml: welcomePacket.developerGuideHtml,
-          opsWelcomeGuideHtml: welcomePacket.opsWelcomeGuideHtml,
-          quickStartChecklistHtml: welcomePacket.quickStartChecklistHtml,
           requestBodyJson: welcomePacket.requestBodyJson,
           webhookPayloadJson: welcomePacket.webhookPayloadJson,
           emailPayloadJson: welcomePacket.emailPayloadJson,
@@ -304,7 +303,56 @@ function HomeContent() {
         }),
       });
 
-      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response:", text.substring(0, 200));
+        throw new Error(
+          `Server returned non-JSON response. Status: ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send email");
+      }
+    } catch (error) {
+      console.error("Error sending developer packet:", error);
+      alert(
+        `Failed to send developer email: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }\n\nYou can still download the files manually.`
+      );
+      throw error;
+    } finally {
+      setIsSendingPacket(false);
+    }
+  };
+
+  const handleSendOpsPacket = async (email: string) => {
+    if (!welcomePacket || !newlyCreatedService) {
+      return;
+    }
+
+    setIsSendingPacket(true);
+
+    try {
+      const response = await fetch("/api/send-preview-packet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: email,
+          serviceName: newlyCreatedService.name,
+          serviceId: newlyCreatedService.id,
+          packetType: "ops",
+          opsWelcomeGuideHtml: welcomePacket.opsWelcomeGuideHtml,
+          quickStartChecklistHtml: welcomePacket.quickStartChecklistHtml,
+        }),
+      });
+
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
@@ -324,10 +372,9 @@ function HomeContent() {
       setIsPreviewPacketOpen(false);
       setIsNextStepsOpen(true);
     } catch (error) {
-      console.error("Error sending preview packet:", error);
-      // Show error but still allow user to proceed
+      console.error("Error sending ops packet:", error);
       alert(
-        `Failed to send email: ${
+        `Failed to send ops email: ${
           error instanceof Error ? error.message : "Unknown error"
         }\n\nYou can still download the files manually.`
       );
@@ -1342,9 +1389,10 @@ function HomeContent() {
       <PreviewPacketModal
         open={isPreviewPacketOpen}
         onOpenChange={setIsPreviewPacketOpen}
-        emailAddress={previewEmail}
+        initialEmail={previewEmail}
         previewPacket={welcomePacket}
-        onSend={handleSendPreviewPacket}
+        onSendDeveloper={handleSendDeveloperPacket}
+        onSendOps={handleSendOpsPacket}
         isSending={isSendingPacket}
       />
 
