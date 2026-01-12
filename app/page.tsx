@@ -38,8 +38,8 @@ import { PreviewPacketModal } from "@/components/services/PreviewPacketModal";
 import { TestRunner } from "@/components/services/TestRunner";
 import { NextStepsCard } from "@/components/services/NextStepsCard";
 import { TrialCreditsDisplay } from "@/components/services/TrialCreditsDisplay";
-import { generatePreviewPacket } from "@/lib/utils/previewPacketGenerator";
-import type { PreviewPacket } from "@/lib/utils/previewPacketGenerator";
+import { generateWelcomePacket } from "@/lib/utils/welcomePacketGenerator";
+import type { WelcomePacket } from "@/lib/utils/welcomePacketGenerator";
 
 type Destination = {
   id: string;
@@ -103,7 +103,7 @@ export default function Home() {
   const [isPreviewPacketOpen, setIsPreviewPacketOpen] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isNextStepsOpen, setIsNextStepsOpen] = useState(false);
-  const [previewPacket, setPreviewPacket] = useState<PreviewPacket | null>(
+  const [welcomePacket, setWelcomePacket] = useState<WelcomePacket | null>(
     null
   );
   const [previewEmail, setPreviewEmail] = useState("");
@@ -262,9 +262,9 @@ export default function Home() {
       tokenConnections: [],
     };
 
-    // Generate preview packet
-    const packet = generatePreviewPacket(newServiceData, email);
-    setPreviewPacket(packet);
+    // Generate welcome packet
+    const packet = generateWelcomePacket(newServiceData, email);
+    setWelcomePacket(packet);
     setPreviewEmail(email);
     setNewlyCreatedService(newServiceData);
 
@@ -277,7 +277,7 @@ export default function Home() {
   };
 
   const handleSendPreviewPacket = async () => {
-    if (!previewPacket || !newlyCreatedService) {
+    if (!welcomePacket || !newlyCreatedService) {
       return;
     }
 
@@ -293,10 +293,14 @@ export default function Home() {
           to: previewEmail,
           serviceName: newlyCreatedService.name,
           serviceId: newlyCreatedService.id,
-          html: previewPacket.html,
-          requestBodyJson: previewPacket.requestBodyJson,
-          webhookPayloadJson: previewPacket.webhookPayloadJson,
-          emailPayloadJson: previewPacket.emailPayloadJson,
+          developerGuideHtml: welcomePacket.developerGuideHtml,
+          opsWelcomeGuideHtml: welcomePacket.opsWelcomeGuideHtml,
+          quickStartChecklistHtml: welcomePacket.quickStartChecklistHtml,
+          requestBodyJson: welcomePacket.requestBodyJson,
+          webhookPayloadJson: welcomePacket.webhookPayloadJson,
+          emailPayloadJson: welcomePacket.emailPayloadJson,
+          successExampleJson: welcomePacket.successExampleJson,
+          failureExampleJson: welcomePacket.failureExampleJson,
         }),
       });
 
@@ -1334,12 +1338,12 @@ export default function Home() {
         isCreating={false}
       />
 
-      {/* Preview Packet Modal */}
+      {/* Welcome Packet Modal */}
       <PreviewPacketModal
         open={isPreviewPacketOpen}
         onOpenChange={setIsPreviewPacketOpen}
         emailAddress={previewEmail}
-        previewPacket={previewPacket}
+        previewPacket={welcomePacket}
         onSend={handleSendPreviewPacket}
         isSending={isSendingPacket}
       />
@@ -1363,7 +1367,7 @@ export default function Home() {
                 Service Created Successfully!
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                Your preview packet has been sent. Here&apos;s what to do next.
+                Your welcome packet has been sent. Here&apos;s what to do next.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">

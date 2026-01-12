@@ -30,14 +30,18 @@ export async function POST(request: Request) {
       to,
       serviceName,
       serviceId,
-      html,
+      developerGuideHtml,
+      opsWelcomeGuideHtml,
+      quickStartChecklistHtml,
       requestBodyJson,
       webhookPayloadJson,
       emailPayloadJson,
+      successExampleJson,
+      failureExampleJson,
     } = body;
 
     // Validate required fields
-    if (!to || !serviceName || !html) {
+    if (!to || !serviceName || !developerGuideHtml) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
         process.env.RESEND_FROM_EMAIL ||
         "Service Network <onboarding@resend.dev>",
       to: [to],
-      subject: `Your ${serviceName} Preview Packet & Developer Guide`,
+      subject: `Welcome Packet - ${serviceName} | Developer Guide & Quick Start`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -61,24 +65,36 @@ export async function POST(request: Request) {
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1e293b; background: #f8fafc; padding: 20px;">
           <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); padding: 40px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #06b6d4; font-size: 2em; margin-bottom: 10px;">Preview Packet Ready</h1>
-              <p style="color: #64748b; font-size: 1.1em;">Your complete developer guide for ${serviceName}</p>
+              <h1 style="color: #06b6d4; font-size: 2em; margin-bottom: 10px;">Welcome Packet Ready</h1>
+              <p style="color: #64748b; font-size: 1.1em;">Your complete guide for ${serviceName}</p>
             </div>
             
-            <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
-              <h2 style="color: #0f172a; font-size: 1.3em; margin-bottom: 15px;">What's Included</h2>
-              <ul style="color: #475569; line-height: 2;">
-                <li><strong>service-guide.html</strong> - Complete developer documentation</li>
-                <li><strong>request-body.json</strong> - API request examples</li>
-                <li><strong>webhook-payload.json</strong> - Webhook payload structure</li>
-                <li><strong>email-payload.json</strong> - Email payload structure</li>
-              </ul>
-            </div>
-
             <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 30px;">
               <p style="color: #92400e; margin: 0;">
                 <strong>Service ID:</strong> <code style="background: #fbbf24; padding: 2px 6px; border-radius: 4px;">${serviceId}</code>
               </p>
+            </div>
+
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+              <h2 style="color: #1e40af; font-size: 1.3em; margin-bottom: 15px; margin-top: 0;">For Developers</h2>
+              <p style="color: #1e3a8a; margin-bottom: 10px;">Technical documentation and integration files:</p>
+              <ul style="color: #1e3a8a; line-height: 2; margin: 0;">
+                <li><strong>developer-guide.html</strong> - Complete technical documentation</li>
+                <li><strong>request-body.json</strong> - API request template</li>
+                <li><strong>webhook-payload.json</strong> - Webhook payload structure</li>
+                <li><strong>email-payload.json</strong> - Email payload structure</li>
+                <li><strong>success-example.json</strong> - Complete success scenario</li>
+                <li><strong>failure-example.json</strong> - Failure scenario with error handling</li>
+              </ul>
+            </div>
+
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
+              <h2 style="color: #065f46; font-size: 1.3em; margin-bottom: 15px; margin-top: 0;">For Your Team</h2>
+              <p style="color: #047857; margin-bottom: 10px;">Non-technical guides and checklists:</p>
+              <ul style="color: #047857; line-height: 2; margin: 0;">
+                <li><strong>welcome-guide.html</strong> - Simple guide explaining what the service does</li>
+                <li><strong>quick-start-checklist.html</strong> - Step-by-step checklist to get started</li>
+              </ul>
             </div>
 
             <p style="color: #64748b; margin-bottom: 20px;">
@@ -95,9 +111,10 @@ export async function POST(request: Request) {
         </html>
       `,
       attachments: [
+        // Developer files
         {
-          filename: "service-guide.html",
-          content: Buffer.from(html).toString("base64"),
+          filename: "developer-guide.html",
+          content: Buffer.from(developerGuideHtml).toString("base64"),
           contentType: "text/html",
         },
         {
@@ -114,6 +131,27 @@ export async function POST(request: Request) {
           filename: "email-payload.json",
           content: Buffer.from(emailPayloadJson).toString("base64"),
           contentType: "application/json",
+        },
+        {
+          filename: "success-example.json",
+          content: Buffer.from(successExampleJson).toString("base64"),
+          contentType: "application/json",
+        },
+        {
+          filename: "failure-example.json",
+          content: Buffer.from(failureExampleJson).toString("base64"),
+          contentType: "application/json",
+        },
+        // Ops team files
+        {
+          filename: "welcome-guide.html",
+          content: Buffer.from(opsWelcomeGuideHtml).toString("base64"),
+          contentType: "text/html",
+        },
+        {
+          filename: "quick-start-checklist.html",
+          content: Buffer.from(quickStartChecklistHtml).toString("base64"),
+          contentType: "text/html",
         },
       ],
     });

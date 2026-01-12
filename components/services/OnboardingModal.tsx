@@ -82,7 +82,7 @@ export function OnboardingModal({
             <ul className="space-y-2 text-sm text-slate-400">
               <li className="flex items-start gap-2">
                 <span className="text-cyan-400 mt-1">✓</span>
-                <span>Complete preview packet with developer guide</span>
+                <span>Complete welcome packet with developer guide and team resources</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-cyan-400 mt-1">✓</span>

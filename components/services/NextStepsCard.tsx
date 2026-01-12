@@ -41,11 +41,11 @@ export function NextStepsCard({
                 </Badge>
               </div>
               <p className="text-sm text-slate-400 mb-3">
-                Your preview packet has been sent to{" "}
+                Your welcome packet has been sent to{" "}
                 <span className="text-cyan-400 font-mono">{emailAddress}</span>
               </p>
               <p className="text-xs text-slate-500">
-                The email includes: HTML developer guide, request body JSON, webhook payload JSON, and email payload JSON
+                The email includes: Developer guide (6 files) and Ops team resources (2 files) with success/failure examples
               </p>
             </div>
           </div>

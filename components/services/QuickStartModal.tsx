@@ -95,7 +95,7 @@ export function QuickStartModal({
             </DialogTitle>
           </div>
           <DialogDescription className="text-slate-400">
-            Create your first service in minutes. We'll send you a complete preview packet with everything you need.
+            Create your first service in minutes. We'll send you a complete welcome packet with everything you need.
           </DialogDescription>
         </DialogHeader>
 
@@ -139,7 +139,7 @@ export function QuickStartModal({
               <p className="text-xs text-red-400">{emailError}</p>
             )}
             <p className="text-xs text-slate-500">
-              We'll send your preview packet with developer guide and JSON examples to this address
+              We'll send your welcome packet with developer guide, examples, and team resources to this address
             </p>
           </div>
 
