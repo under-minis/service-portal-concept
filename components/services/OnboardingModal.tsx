@@ -70,31 +70,43 @@ export function OnboardingModal({
           <div className="p-4 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
             <div className="flex items-center gap-3 mb-2">
               <Gift className="h-5 w-5 text-yellow-400" />
-              <h3 className="font-semibold text-slate-200">Free Trial Credits</h3>
+              <h3 className="font-semibold text-slate-200">
+                Free Trial Credits
+              </h3>
             </div>
             <p className="text-sm text-slate-400">
-              Receive $50 in free trial credits to test everything (~500 test runs)
+              Receive $50 in free trial credits to test everything (~500 test
+              runs)
             </p>
           </div>
 
           <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
-            <h3 className="font-semibold text-slate-200 mb-3">What you'll get:</h3>
+            <h3 className="font-semibold text-slate-200 mb-3">
+              What you&apos;ll get:
+            </h3>
             <ul className="space-y-2 text-sm text-slate-400">
               <li className="flex items-start gap-2">
                 <span className="text-cyan-400 mt-1">✓</span>
-                <span>Complete welcome packet with developer guide and team resources</span>
+                <span>
+                  Complete welcome packet with user guide and team resources
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-cyan-400 mt-1">✓</span>
-                <span>JSON examples for API integration</span>
+                <span>Easy to use form for running your service</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-cyan-400 mt-1">✓</span>
-                <span>Test runner to see your service in action</span>
+                <span>
+                  Manual service runner inside you service details page
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-cyan-400 mt-1">✓</span>
-                <span>Clear next steps to production</span>
+                <span>
+                  Automated notifications containing the results of your service
+                  to your email destinations
+                </span>
               </li>
             </ul>
           </div>
@@ -119,4 +131,3 @@ export function OnboardingModal({
     </Dialog>
   );
 }
-

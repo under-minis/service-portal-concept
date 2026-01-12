@@ -3,13 +3,6 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -24,160 +17,190 @@ import {
 import {
   Search,
   Download,
-  Code,
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
   Filter,
   X,
-  Clock,
-  Network,
-  FileCode,
-  XCircle,
+  FileText,
+  Calendar,
 } from "lucide-react";
-import type { ServiceEvent } from "@/types/service";
-import { mockEvents } from "@/data/mockEvents";
 import { mockServices } from "@/data/mockServices";
-import { StatusIcon } from "@/components/services/StatusIcon";
-import { CopyButton } from "@/components/services/CopyButton";
 import { formatDate, formatFileSize } from "@/lib/utils/formatting";
-import { getTypeBadgeVariant } from "@/lib/utils/eventHelpers";
 
-type SortField = "timestamp" | "type" | "status" | "service";
+type Report = {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  date: Date;
+  filename: string;
+  url: string;
+  size: number;
+};
+
+type SortField = "date" | "filename" | "size" | "service";
 type SortDirection = "asc" | "desc";
-type EventType = "success" | "error" | "destination" | "report" | "all";
-type EventStatus = "completed" | "failed" | "pending" | "all";
 
 const ITEMS_PER_PAGE = 10;
 
-export default function EventsPage() {
+// Mock reports data - in real app would fetch from API
+const generateMockReports = (): Report[] => {
+  const reports: Report[] = [];
+  const now = Date.now();
+  
+  mockServices.forEach((service, serviceIdx) => {
+    // Generate 2-5 reports per service
+    const reportCount = 2 + (serviceIdx % 4);
+    for (let i = 0; i < reportCount; i++) {
+      const daysAgo = i * 2 + (serviceIdx % 3);
+      const reportDate = new Date(now - daysAgo * 86400000);
+      const dateStr = reportDate.toISOString().split('T')[0];
+      
+      reports.push({
+        id: `rpt-${service.id}-${i}`,
+        serviceId: service.id,
+        serviceName: service.name,
+        date: reportDate,
+        filename: `report-${service.id}-${dateStr}.html`,
+        url: `/reports/verification-report-${service.id}-${i}.html`,
+        size: 150000 + Math.random() * 200000, // 150KB - 350KB
+      });
+    }
+  });
+  
+  return reports;
+};
+
+const mockReports = generateMockReports();
+
+export default function ReportsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<SortField>("timestamp");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedService, setSelectedService] = useState<string>("all");
-  const [selectedEventType, setSelectedEventType] = useState<EventType>("all");
-  const [selectedStatus, setSelectedStatus] = useState<EventStatus>("all");
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedEvent, setSelectedEvent] = useState<ServiceEvent | null>(null);
-  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  const filteredAndSortedEvents = useMemo(() => {
-    let filtered = [...mockEvents];
+  const filteredAndSortedReports = useMemo(() => {
+    let filtered = [...mockReports];
 
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (event) =>
-          event.recordId?.toLowerCase().includes(query) ||
-          event.requestId?.toLowerCase().includes(query) ||
-          event.id.toLowerCase().includes(query)
+        (report) =>
+          report.filename.toLowerCase().includes(query) ||
+          report.serviceName.toLowerCase().includes(query) ||
+          report.serviceId.toLowerCase().includes(query)
       );
     }
 
     // Service filter
     if (selectedService !== "all") {
-      filtered = filtered.filter((event) => event.serviceId === selectedService);
+      filtered = filtered.filter((report) => report.serviceId === selectedService);
     }
 
-    // Event type filter
-    if (selectedEventType !== "all") {
-      filtered = filtered.filter((event) => event.type === selectedEventType);
-    }
-
-    // Status filter
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter((event) => event.status === selectedStatus);
-    }
-
-    // Sort
+    // Sorting
     filtered.sort((a, b) => {
-      let aValue: string | number;
-      let bValue: string | number;
-
+      let comparison = 0;
+      
       switch (sortField) {
-        case "timestamp":
-          aValue = new Date(a.timestamp).getTime();
-          bValue = new Date(b.timestamp).getTime();
+        case "date":
+          comparison = a.date.getTime() - b.date.getTime();
           break;
-        case "type":
-          aValue = a.type;
-          bValue = b.type;
+        case "filename":
+          comparison = a.filename.localeCompare(b.filename);
           break;
-        case "status":
-          aValue = a.status;
-          bValue = b.status;
+        case "size":
+          comparison = a.size - b.size;
           break;
         case "service":
-          const serviceA = mockServices.find((s) => s.id === a.serviceId);
-          const serviceB = mockServices.find((s) => s.id === b.serviceId);
-          aValue = serviceA?.name || a.serviceId;
-          bValue = serviceB?.name || b.serviceId;
+          comparison = a.serviceName.localeCompare(b.serviceName);
           break;
-        default:
-          return 0;
       }
-
-      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-      return 0;
+      
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     return filtered;
-  }, [
-    searchQuery,
-    selectedService,
-    selectedEventType,
-    selectedStatus,
-    sortField,
-    sortDirection,
-  ]);
+  }, [searchQuery, selectedService, sortField, sortDirection]);
 
-  const totalPages = Math.ceil(filteredAndSortedEvents.length / ITEMS_PER_PAGE);
-  const paginatedEvents = useMemo(() => {
+  const totalPages = Math.ceil(filteredAndSortedReports.length / ITEMS_PER_PAGE);
+  const paginatedReports = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredAndSortedEvents.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredAndSortedEvents, currentPage]);
+    return filteredAndSortedReports.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAndSortedReports, currentPage]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection("asc");
+      setSortDirection("desc");
     }
   };
 
-  const handleViewEvent = (event: ServiceEvent) => {
-    setSelectedEvent(event);
-    setIsEventModalOpen(true);
-  };
-
-  const handleDownloadReport = (event: ServiceEvent) => {
-    if (event.reportDocument) {
-      const link = document.createElement("a");
-      link.href = event.reportDocument.url;
-      link.download = event.reportDocument.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+  const handleDownload = (report: Report) => {
+    // Create a blob with mock report content
+    const reportContent = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${report.filename}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #e2e8f0; }
+    h1 { color: #22d3ee; }
+    .info { background: #1e293b; padding: 15px; border-radius: 8px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Service Report</h1>
+  <div class="info">
+    <p><strong>Service:</strong> ${report.serviceName}</p>
+    <p><strong>Service ID:</strong> ${report.serviceId}</p>
+    <p><strong>Date:</strong> ${formatDate(report.date)}</p>
+    <p><strong>Filename:</strong> ${report.filename}</p>
+    <p><strong>Size:</strong> ${formatFileSize(report.size)}</p>
+  </div>
+  <div class="info">
+    <h2>Report Data</h2>
+    <p>This is a sample report generated for ${report.serviceName}.</p>
+    <p>Report ID: ${report.id}</p>
+  </div>
+</body>
+</html>`;
+    
+    const blob = new Blob([reportContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = report.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedService("all");
-    setSelectedEventType("all");
-    setSelectedStatus("all");
     setCurrentPage(1);
   };
 
-  const hasActiveFilters =
-    searchQuery ||
-    selectedService !== "all" ||
-    selectedEventType !== "all" ||
-    selectedStatus !== "all";
+  const hasActiveFilters = searchQuery || selectedService !== "all";
+
+  const SortButton = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <button
+      onClick={() => handleSort(field)}
+      className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+    >
+      {children}
+      {sortField === field && (
+        <ArrowUpDown
+          className={`h-3 w-3 ${sortDirection === "asc" ? "rotate-180" : ""}`}
+        />
+      )}
+    </button>
+  );
 
   return (
     <>
@@ -202,115 +225,89 @@ export default function EventsPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-            Event Logs
+            Reports
           </h1>
           <p className="text-slate-400 text-lg">
-            Monitor and analyze all service events across your network
+            Download and manage all service reports
           </p>
         </div>
 
-        {/* Filters and Search */}
+        {/* Filters */}
         <Card className="mb-6 rounded-2xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/50">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Filter className="h-5 w-5 text-cyan-400" />
-                <CardTitle className="text-lg text-slate-200">Filters</CardTitle>
+                <CardTitle className="text-lg text-slate-200">Filters & Search</CardTitle>
               </div>
               {hasActiveFilters && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={clearFilters}
-                  className="border-slate-700/50 hover:border-red-500/50 hover:bg-red-500/10 text-slate-300"
+                  className="text-slate-400 hover:text-slate-300"
                 >
                   <X className="h-4 w-4 mr-2" />
-                  Clear All
+                  Clear Filters
                 </Button>
               )}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
-                <Input
-                  placeholder="Search by ID..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Search */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Input
+                    placeholder="Search by filename or service..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-10 bg-slate-900/50 border-slate-700/50 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500/50"
+                  />
+                </div>
+              </div>
+
+              {/* Service Filter */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">Service</Label>
+                <Select
+                  value={selectedService}
+                  onValueChange={(value) => {
+                    setSelectedService(value);
                     setCurrentPage(1);
                   }}
-                  className="pl-10 bg-slate-900/50 border-slate-700/50 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500/50"
-                />
+                >
+                  <SelectTrigger className="bg-slate-900/50 border-slate-700/50 text-slate-200">
+                    <SelectValue placeholder="All Services" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Services</SelectItem>
+                    {mockServices.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Select
-                value={selectedService}
-                onValueChange={(value) => {
-                  setSelectedService(value);
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="bg-slate-900/50 border-slate-700/50 text-slate-200">
-                  <SelectValue placeholder="All Services" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="all">All Services</SelectItem>
-                  {mockServices.map((service) => (
-                    <SelectItem key={service.id} value={service.id}>
-                      {service.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={selectedEventType}
-                onValueChange={(value) => {
-                  setSelectedEventType(value as EventType);
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="bg-slate-900/50 border-slate-700/50 text-slate-200">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                  <SelectItem value="destination">Destination</SelectItem>
-                  <SelectItem value="report">Report</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={selectedStatus}
-                onValueChange={(value) => {
-                  setSelectedStatus(value as EventStatus);
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="bg-slate-900/50 border-slate-700/50 text-slate-200">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </CardContent>
         </Card>
 
-        {/* Events Table */}
+        {/* Reports Table */}
         <Card className="rounded-2xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/50">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Clock className="h-6 w-6 text-cyan-400" />
-                <CardTitle className="text-2xl text-slate-200">Events</CardTitle>
-                <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30">
-                  {filteredAndSortedEvents.length}
+                <FileText className="h-6 w-6 text-green-400" />
+                <CardTitle className="text-2xl text-slate-200">Reports</CardTitle>
+                <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                  {filteredAndSortedReports.length}
                 </Badge>
               </div>
             </div>
@@ -321,61 +318,35 @@ export default function EventsPage() {
                 <thead>
                   <tr className="border-b border-slate-700/50">
                     <th className="px-6 py-4 text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("timestamp")}
-                        className="h-8 -ml-3 text-slate-300 hover:text-cyan-400"
-                      >
-                        Timestamp
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
+                      <SortButton field="date">
+                        <span className="text-slate-300">Date</span>
+                      </SortButton>
                     </th>
                     <th className="px-6 py-4 text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("service")}
-                        className="h-8 -ml-3 text-slate-300 hover:text-cyan-400"
-                      >
-                        Service
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
+                      <SortButton field="service">
+                        <span className="text-slate-300">Service</span>
+                      </SortButton>
                     </th>
                     <th className="px-6 py-4 text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("type")}
-                        className="h-8 -ml-3 text-slate-300 hover:text-cyan-400"
-                      >
-                        Type
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
+                      <SortButton field="filename">
+                        <span className="text-slate-300">Filename</span>
+                      </SortButton>
                     </th>
-                    <th className="px-6 py-4 text-left text-slate-300">Record ID</th>
-                    <th className="px-6 py-4 text-left text-slate-300">Request ID</th>
                     <th className="px-6 py-4 text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("status")}
-                        className="h-8 -ml-3 text-slate-300 hover:text-cyan-400"
-                      >
-                        Status
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
+                      <SortButton field="size">
+                        <span className="text-slate-300">Size</span>
+                      </SortButton>
                     </th>
                     <th className="px-6 py-4 text-right text-slate-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedEvents.length === 0 ? (
+                  {paginatedReports.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
+                      <td colSpan={5} className="px-6 py-12 text-center">
                         <div className="text-slate-400">
-                          <Clock className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                          <p className="text-lg">No events found</p>
+                          <FileText className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+                          <p className="text-lg">No reports found</p>
                           {hasActiveFilters && (
                             <p className="text-sm mt-2">Try adjusting your filters</p>
                           )}
@@ -383,75 +354,53 @@ export default function EventsPage() {
                       </td>
                     </tr>
                   ) : (
-                    paginatedEvents.map((event) => {
-                      const service = mockServices.find((s) => s.id === event.serviceId);
-                      return (
-                        <tr
-                          key={event.id}
-                          className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-slate-400 font-mono">
-                              {formatDate(event.timestamp)}
+                    paginatedReports.map((report) => (
+                      <tr
+                        key={report.id}
+                        className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-slate-500" />
+                            <div className="text-sm text-slate-400">
+                              {formatDate(report.date)}
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div
-                              className="text-sm text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors"
-                              onClick={() => router.push(`/services/${event.serviceId}`)}
-                            >
-                              {service?.name || event.serviceId}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge variant={getTypeBadgeVariant(event.type)}>
-                              {event.type}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-mono text-cyan-400">
-                              {event.recordId || "-"}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-mono text-purple-400">
-                              {event.requestId || "-"}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <StatusIcon status={event.status} />
-                              <span className="text-sm capitalize text-slate-300">
-                                {event.status}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {event.reportDocument && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDownloadReport(event)}
-                                  className="border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewEvent(event)}
-                                className="border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300"
-                              >
-                                <Code className="h-4 w-4 mr-2" />
-                                View
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div
+                            className="text-sm text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors"
+                            onClick={() => router.push(`/services/${report.serviceId}`)}
+                          >
+                            {report.serviceName}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-green-400" />
+                            <span className="text-sm text-slate-200 font-mono">
+                              {report.filename}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-slate-400">
+                            {formatFileSize(report.size)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(report)}
+                            className="border-slate-700/50 hover:border-green-500/50 hover:bg-green-500/10 text-slate-300"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -462,8 +411,8 @@ export default function EventsPage() {
               <div className="px-6 py-4 border-t border-slate-700/50 flex items-center justify-between">
                 <div className="text-sm text-slate-400">
                   Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
-                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedEvents.length)} of{" "}
-                  {filteredAndSortedEvents.length} events
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedReports.length)} of{" "}
+                  {filteredAndSortedReports.length} reports
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -520,300 +469,6 @@ export default function EventsPage() {
           </CardContent>
         </Card>
       </main>
-
-      {/* Event Details Modal - Reuse from service details */}
-      <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
-          <DialogHeader>
-            <DialogTitle className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              Event Inspector
-            </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              {selectedEvent && (
-                <span className="font-mono text-cyan-400">{selectedEvent.id}</span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEvent && (
-            <div className="space-y-6">
-              {/* Basic Event Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
-                <div>
-                  <Label className="text-slate-400 text-xs uppercase tracking-wider">
-                    Timestamp
-                  </Label>
-                  <p className="mt-2 text-slate-200 font-mono text-sm">
-                    {formatDate(selectedEvent.timestamp)}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-slate-400 text-xs uppercase tracking-wider">
-                    Type
-                  </Label>
-                  <div className="mt-2">
-                    <Badge variant={getTypeBadgeVariant(selectedEvent.type)}>
-                      {selectedEvent.type}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-slate-400 text-xs uppercase tracking-wider">
-                    Record ID
-                  </Label>
-                  <p className="mt-2 font-mono text-sm text-cyan-400">
-                    {selectedEvent.recordId || "-"}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-slate-400 text-xs uppercase tracking-wider">
-                    Request ID
-                  </Label>
-                  <p className="mt-2 font-mono text-sm text-purple-400">
-                    {selectedEvent.requestId || "-"}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-slate-400 text-xs uppercase tracking-wider">
-                    Status
-                  </Label>
-                  <div className="mt-2 flex items-center gap-2">
-                    <StatusIcon status={selectedEvent.status} />
-                    <span className="capitalize text-slate-200">
-                      {selectedEvent.status}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-slate-400 text-xs uppercase tracking-wider">
-                    Service
-                  </Label>
-                  <p
-                    className="mt-2 text-sm text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors"
-                    onClick={() => {
-                      setIsEventModalOpen(false);
-                      router.push(`/services/${selectedEvent.serviceId}`);
-                    }}
-                  >
-                    {mockServices.find((s) => s.id === selectedEvent.serviceId)?.name ||
-                      selectedEvent.serviceId}
-                  </p>
-                </div>
-              </div>
-
-              {/* Error Details */}
-              {selectedEvent.errorDetails && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <XCircle className="h-5 w-5 text-red-400" />
-                    <Label className="text-lg font-semibold text-slate-200">
-                      Error Details
-                    </Label>
-                  </div>
-                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4">
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                          Message
-                        </Label>
-                        <p className="text-sm text-red-300 font-medium">
-                          {selectedEvent.errorDetails.message}
-                        </p>
-                      </div>
-                      {selectedEvent.errorDetails.code && (
-                        <div>
-                          <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                            Error Code
-                          </Label>
-                          <code className="px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded text-sm text-red-400 font-mono">
-                            {selectedEvent.errorDetails.code}
-                          </code>
-                        </div>
-                      )}
-                      {selectedEvent.errorDetails.stack && (
-                        <div>
-                          <Label className="text-sm font-medium text-slate-300 mb-2 block">
-                            Stack Trace
-                          </Label>
-                          <pre className="text-xs bg-slate-950 border border-slate-700/50 p-4 rounded-lg overflow-auto max-h-60 text-slate-300 font-mono">
-                            {selectedEvent.errorDetails.stack}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Destination Details */}
-              {selectedEvent.destinationDetails && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Network className="h-5 w-5 text-cyan-400" />
-                    <Label className="text-lg font-semibold text-slate-200">
-                      Destination Details
-                    </Label>
-                  </div>
-                  <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-4">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                            Type
-                          </Label>
-                          <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 capitalize">
-                            {selectedEvent.destinationDetails.type}
-                          </Badge>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                            Destination
-                          </Label>
-                          <p className="font-mono text-sm text-cyan-400 break-all">
-                            {selectedEvent.destinationDetails.destination}
-                          </p>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="text-sm font-medium text-slate-300">
-                            Payload
-                          </Label>
-                          <CopyButton
-                            text={JSON.stringify(
-                              selectedEvent.destinationDetails.payload,
-                              null,
-                              2
-                            )}
-                          />
-                        </div>
-                        <pre className="text-xs bg-slate-950 border border-slate-700/50 p-4 rounded-lg overflow-auto max-h-80 text-slate-300 font-mono">
-                          {JSON.stringify(
-                            selectedEvent.destinationDetails.payload,
-                            null,
-                            2
-                          )}
-                        </pre>
-                      </div>
-                      {selectedEvent.destinationDetails.response && (
-                        <div className="pt-4 border-t border-slate-700/50">
-                          <Label className="text-sm font-medium text-slate-300 mb-3 block">
-                            Webhook Response
-                          </Label>
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-slate-400">Status:</span>
-                              <Badge
-                                className={
-                                  selectedEvent.destinationDetails.response.status >=
-                                    200 &&
-                                  selectedEvent.destinationDetails.response.status < 300
-                                    ? "bg-green-500/20 text-green-300 border-green-500/30"
-                                    : "bg-red-500/20 text-red-300 border-red-500/30"
-                                }
-                              >
-                                {selectedEvent.destinationDetails.response.status}{" "}
-                                {selectedEvent.destinationDetails.response.statusText}
-                              </Badge>
-                            </div>
-                            {selectedEvent.destinationDetails.response.body && (
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <Label className="text-xs text-slate-400">
-                                    Response Body
-                                  </Label>
-                                  <CopyButton
-                                    text={selectedEvent.destinationDetails.response.body}
-                                  />
-                                </div>
-                                <pre className="text-xs bg-slate-950 border border-slate-700/50 p-3 rounded-lg overflow-auto max-h-40 text-slate-300 font-mono">
-                                  {selectedEvent.destinationDetails.response.body}
-                                </pre>
-                              </div>
-                            )}
-                            {selectedEvent.destinationDetails.response.headers && (
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <Label className="text-xs text-slate-400">
-                                    Response Headers
-                                  </Label>
-                                  <CopyButton
-                                    text={JSON.stringify(
-                                      selectedEvent.destinationDetails.response.headers,
-                                      null,
-                                      2
-                                    )}
-                                  />
-                                </div>
-                                <pre className="text-xs bg-slate-950 border border-slate-700/50 p-3 rounded-lg overflow-auto max-h-40 text-slate-300 font-mono">
-                                  {JSON.stringify(
-                                    selectedEvent.destinationDetails.response.headers,
-                                    null,
-                                    2
-                                  )}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Report Document */}
-              {selectedEvent.reportDocument && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileCode className="h-5 w-5 text-purple-400" />
-                    <Label className="text-lg font-semibold text-slate-200">
-                      Report Document
-                    </Label>
-                  </div>
-                  <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-4">
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                          Filename
-                        </Label>
-                        <p className="text-sm text-purple-300 font-mono">
-                          {selectedEvent.reportDocument.filename}
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                            Content Type
-                          </Label>
-                          <Badge className="bg-slate-800/50 text-slate-300 border-slate-700/50">
-                            {selectedEvent.reportDocument.contentType}
-                          </Badge>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-slate-300 mb-1 block">
-                            Size
-                          </Label>
-                          <p className="text-sm text-purple-300 font-semibold">
-                            {formatFileSize(selectedEvent.reportDocument.size)}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => handleDownloadReport(selectedEvent)}
-                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white border-0 shadow-lg shadow-purple-500/25"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download Report
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
-

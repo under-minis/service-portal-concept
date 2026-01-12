@@ -1,121 +1,31 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Plus,
-  Eye,
-  ChevronRight,
-  ChevronLeft,
-  Trash2,
-  Zap,
-  Network,
-  Sparkles,
-  ArrowRight,
-} from "lucide-react";
+import { Zap, Sparkles, ArrowRight, Network, Plus, Eye } from "lucide-react";
 import type { Service } from "@/types/service";
 import { mockWorkflows } from "@/data/mockWorkflows";
 import { formatCurrency } from "@/lib/utils/formatting";
 import { calculateCostPerRun } from "@/lib/utils/costCalculation";
 import { OnboardingModal } from "@/components/services/OnboardingModal";
 import { QuickStartModal } from "@/components/services/QuickStartModal";
-import { PreviewPacketModal } from "@/components/services/PreviewPacketModal";
-import { TestRunner } from "@/components/services/TestRunner";
-import { NextStepsCard } from "@/components/services/NextStepsCard";
 import { TrialCreditsDisplay } from "@/components/services/TrialCreditsDisplay";
-import { generateWelcomePacket } from "@/lib/utils/welcomePacketGenerator";
-import type { WelcomePacket } from "@/lib/utils/welcomePacketGenerator";
 import { EventStream, type Event } from "@/components/services/EventStream";
-
-type Destination = {
-  id: string;
-  type: "webhook" | "email";
-  url?: string;
-  email?: string;
-  name?: string;
-  tokenService?: {
-    type: "oauth" | "custom";
-    oauthConfig?: {
-      clientId: string;
-      clientSecret: string;
-      tokenUrl: string;
-      scope?: string;
-    };
-    customConfig?: {
-      clientId: string;
-      tokenServiceUrl: string;
-      headerName: string;
-    };
-  };
-};
-
-type CurrentDestination = {
-  type: "webhook" | "email";
-  url?: string;
-  email?: string;
-  name?: string;
-  tokenServiceType?: "none" | "oauth" | "custom";
-  oauthConfig?: {
-    clientId: string;
-    clientSecret: string;
-    tokenUrl: string;
-    scope?: string;
-  };
-  customConfig?: {
-    clientId: string;
-    tokenServiceUrl: string;
-    headerName: string;
-  };
-};
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [services, setServices] = useState<Service[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>([]);
-  const [createStep, setCreateStep] = useState(1);
-  const [newService, setNewService] = useState({ name: "" });
-  const [destinations, setDestinations] = useState<Destination[]>([]);
-  const [currentDestination, setCurrentDestination] =
-    useState<CurrentDestination>({
-      type: "webhook",
-      tokenServiceType: "none",
-    });
 
   // New state for onboarding flow
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isQuickStartOpen, setIsQuickStartOpen] = useState(false);
-  const [isPreviewPacketOpen, setIsPreviewPacketOpen] = useState(false);
-  const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
-  const [isNextStepsOpen, setIsNextStepsOpen] = useState(false);
-  const [welcomePacket, setWelcomePacket] = useState<WelcomePacket | null>(
-    null
-  );
-  const [previewEmail, setPreviewEmail] = useState("");
-  const [isSendingPacket, setIsSendingPacket] = useState(false);
-  const [newlyCreatedService, setNewlyCreatedService] =
-    useState<Service | null>(null);
-  const [trialCredits, setTrialCredits] = useState(50);
-  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [isCreatingService, setIsCreatingService] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
+  const [trialCredits] = useState(50); // Fixed trial credits
 
   // Event logging helper
   const addEvent = (
@@ -143,13 +53,6 @@ function HomeContent() {
 
     const state = {
       isQuickStartOpen,
-      isPreviewPacketOpen,
-      isTestRunnerOpen,
-      isNextStepsOpen,
-      newlyCreatedService,
-      welcomePacket,
-      previewEmail,
-      completedSteps: Array.from(completedSteps),
       services,
       events: events.map((event) => ({
         ...event,
@@ -158,19 +61,7 @@ function HomeContent() {
     };
 
     sessionStorage.setItem("onboardingFlowState", JSON.stringify(state));
-  }, [
-    isQuickStartOpen,
-    isPreviewPacketOpen,
-    isTestRunnerOpen,
-    isNextStepsOpen,
-    newlyCreatedService,
-    welcomePacket,
-    previewEmail,
-    completedSteps,
-    services,
-    events,
-    isRestoring,
-  ]);
+  }, [isQuickStartOpen, services, events, isRestoring]);
 
   // Restore onboarding flow state from sessionStorage on mount
   useEffect(() => {
@@ -181,7 +72,7 @@ function HomeContent() {
     if (forceOnboarding) {
       // Clear the saved state when reset is forced
       sessionStorage.removeItem("onboardingFlowState");
-      setIsRestoring(false);
+      setTimeout(() => setIsRestoring(false), 0);
       return;
     }
 
@@ -190,31 +81,25 @@ function HomeContent() {
       try {
         const state = JSON.parse(saved);
         // Always restore services, even if empty array (check for array existence)
-        if (Array.isArray(state.services)) {
-          setServices(state.services);
-        }
-        // Always restore events, converting timestamp strings back to Date objects
-        if (Array.isArray(state.events)) {
-          setEvents(
-            state.events.map(
-              (event: Omit<Event, "timestamp"> & { timestamp: string }) => ({
-                ...event,
-                timestamp: new Date(event.timestamp),
-              })
-            )
-          );
-        }
-        if (state.newlyCreatedService)
-          setNewlyCreatedService(state.newlyCreatedService);
-        if (state.welcomePacket) setWelcomePacket(state.welcomePacket);
-        if (state.previewEmail) setPreviewEmail(state.previewEmail);
-        if (state.completedSteps)
-          setCompletedSteps(new Set(state.completedSteps));
-        if (state.isQuickStartOpen) setIsQuickStartOpen(state.isQuickStartOpen);
-        if (state.isPreviewPacketOpen)
-          setIsPreviewPacketOpen(state.isPreviewPacketOpen);
-        if (state.isTestRunnerOpen) setIsTestRunnerOpen(state.isTestRunnerOpen);
-        if (state.isNextStepsOpen) setIsNextStepsOpen(state.isNextStepsOpen);
+        // Defer state updates to avoid cascading renders
+        setTimeout(() => {
+          if (Array.isArray(state.services)) {
+            setServices(state.services);
+          }
+          // Always restore events, converting timestamp strings back to Date objects
+          if (Array.isArray(state.events)) {
+            setEvents(
+              state.events.map(
+                (event: Omit<Event, "timestamp"> & { timestamp: string }) => ({
+                  ...event,
+                  timestamp: new Date(event.timestamp),
+                })
+              )
+            );
+          }
+          if (state.isQuickStartOpen)
+            setIsQuickStartOpen(state.isQuickStartOpen);
+        }, 0);
       } catch (e) {
         console.error("Failed to restore onboarding flow state", e);
       }
@@ -262,144 +147,16 @@ function HomeContent() {
     checkOnboarding();
   }, [searchParams, services.length]);
 
-  const calculatedCost = useMemo(
-    () => calculateCostPerRun(selectedWorkflows.length),
-    [selectedWorkflows.length]
-  );
-
-  const workflowNames = useMemo(
-    () =>
-      mockWorkflows
-        .filter((wf) => selectedWorkflows.includes(wf.id))
-        .map((wf) => wf.name),
-    [selectedWorkflows]
-  );
-
   const handleViewDetails = (service: Service) => {
     router.push(`/services/${service.id}`);
   };
 
-  const handleWorkflowToggle = (workflowId: string) => {
-    setSelectedWorkflows((prev) =>
-      prev.includes(workflowId)
-        ? prev.filter((id) => id !== workflowId)
-        : [...prev, workflowId]
-    );
-  };
-
-  const buildTokenService = (dest: CurrentDestination) => {
-    if (
-      dest.type !== "webhook" ||
-      !dest.tokenServiceType ||
-      dest.tokenServiceType === "none"
-    ) {
-      return undefined;
-    }
-    return {
-      type: dest.tokenServiceType as "oauth" | "custom",
-      oauthConfig:
-        dest.tokenServiceType === "oauth" ? dest.oauthConfig : undefined,
-      customConfig:
-        dest.tokenServiceType === "custom" ? dest.customConfig : undefined,
-    };
-  };
-
-  const buildWebhookConnections = (serviceName: string, baseIndex: number) => {
-    return destinations
-      .filter((d) => d.type === "webhook" && d.url)
-      .map((d, index) => ({
-        id: `wh-${baseIndex}-${index}`,
-        url: d.url!,
-        name: d.name || `${serviceName} Webhook ${index + 1}`,
-        createdAt: new Date().toISOString(),
-        tokenService: d.tokenService,
-      }));
-  };
-
-  const buildEmailDestinations = (serviceName: string, baseIndex: number) => {
-    return destinations
-      .filter((d) => d.type === "email" && d.email)
-      .map((d, index) => ({
-        id: `email-${baseIndex}-${index}`,
-        email: d.email!,
-        name: d.name || `${serviceName} Email ${index + 1}`,
-        createdAt: new Date().toISOString(),
-      }));
-  };
-
-  const handleCreateService = () => {
-    if (!newService.name || selectedWorkflows.length === 0) {
-      return;
-    }
-
-    addEvent(
-      "progress",
-      "Starting advanced service setup...",
-      `Service name: ${newService.name}`
-    );
-    addEvent(
-      "info",
-      "Validating service configuration",
-      `Selected ${selectedWorkflows.length} workflow(s)`
-    );
-
-    const baseIndex = services.length + 1;
-    const webhookConnections = buildWebhookConnections(
-      newService.name,
-      baseIndex
-    );
-    const emailDestinations = buildEmailDestinations(
-      newService.name,
-      baseIndex
-    );
-
-    addEvent(
-      "info",
-      "Configuring destinations",
-      `${webhookConnections.length} webhook(s), ${emailDestinations.length} email(s)`
-    );
-
-    const newServiceData: Service = {
-      id: `svc-${String(baseIndex).padStart(3, "0")}`,
-      name: newService.name,
-      workflowNames,
-      estimatedCostPerRun: calculatedCost,
-      webhookConnections:
-        webhookConnections.length > 0 ? webhookConnections : undefined,
-      emailDestinations:
-        emailDestinations.length > 0 ? emailDestinations : undefined,
-      tokenConnections: [],
-    };
-
-    addEvent(
-      "success",
-      `Service "${newService.name}" created successfully`,
-      `Service ID: ${newServiceData.id}`,
-      {
-        serviceId: newServiceData.id,
-        workflows: workflowNames,
-        costPerRun: calculatedCost,
-      }
-    );
-
-    // Add service to list
-    setServices([...services, newServiceData]);
-
-    // Store in sessionStorage so service details page can find it
-    if (typeof window !== "undefined") {
-      const existingServices = JSON.parse(
-        sessionStorage.getItem("tempServices") || "[]"
-      );
-      existingServices.push(newServiceData);
-      sessionStorage.setItem("tempServices", JSON.stringify(existingServices));
-    }
-
-    setIsCreateModalOpen(false);
-    resetCreateModal();
-  };
-
   // Quick Start handlers
-  const handleQuickStartCreate = async (serviceName: string) => {
+  const handleQuickStartCreate = async (
+    serviceName: string,
+    selectedWorkflows: string[],
+    emailDestinations: Array<{ email: string; name: string }>
+  ) => {
     setIsCreatingService(true);
 
     addEvent(
@@ -412,40 +169,30 @@ function HomeContent() {
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const baseIndex = services.length + 1;
-    const defaultWorkflows = ["wf-001", "wf-002"]; // Email + Phone Verification
-    const defaultWorkflowNames = mockWorkflows
-      .filter((wf) => defaultWorkflows.includes(wf.id))
+    const workflowNames = mockWorkflows
+      .filter((wf) => selectedWorkflows.includes(wf.id))
       .map((wf) => wf.name);
-    const defaultCost = calculateCostPerRun(defaultWorkflows.length);
+    const defaultCost = calculateCostPerRun(selectedWorkflows.length);
 
     addEvent(
       "info",
-      "Configuring default workflows",
-      `Email Verification, Phone Verification (Cost: ${formatCurrency(
-        defaultCost
-      )}/run)`
+      "Configuring workflows",
+      `${workflowNames.join(", ")} (Cost: ${formatCurrency(defaultCost)}/run)`
     );
 
     const newServiceData: Service = {
       id: `svc-${String(baseIndex).padStart(3, "0")}`,
       name: serviceName,
-      workflowNames: defaultWorkflowNames,
+      workflowNames: workflowNames,
       estimatedCostPerRun: defaultCost,
-      emailDestinations: [],
+      emailDestinations: emailDestinations.map((dest, idx) => ({
+        id: `email-${Date.now()}-${idx}`,
+        email: dest.email,
+        name: dest.name,
+        createdAt: new Date().toISOString(),
+      })),
       tokenConnections: [],
     };
-
-    addEvent(
-      "progress",
-      "Generating welcome packet...",
-      "Creating developer guide and team resources"
-    );
-
-    // Generate welcome packet (allow UI to breathe)
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    const packet = generateWelcomePacket(newServiceData);
-    setWelcomePacket(packet);
-    setNewlyCreatedService(newServiceData);
 
     addEvent(
       "success",
@@ -453,7 +200,7 @@ function HomeContent() {
       `Service ID: ${newServiceData.id}`,
       {
         serviceId: newServiceData.id,
-        workflows: defaultWorkflowNames,
+        workflows: workflowNames,
         costPerRun: defaultCost,
       }
     );
@@ -471,199 +218,10 @@ function HomeContent() {
     }
 
     setIsCreatingService(false);
-
-    // Smooth animated transition: fade out quick start, then fade in preview
-    setIsTransitioning(true);
     setIsQuickStartOpen(false);
 
-    // Wait for close animation to complete (200ms from dialog component)
-    // Use a slightly longer delay for smoother transition
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    setIsPreviewPacketOpen(true);
-    // Allow preview modal to start its animation before clearing transition state
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    setIsTransitioning(false);
-  };
-
-  const handleSendDeveloperPacket = async (email: string) => {
-    if (!welcomePacket || !newlyCreatedService) {
-      return;
-    }
-
-    addEvent("progress", "Sending developer welcome packet...", `To: ${email}`);
-    setIsSendingPacket(true);
-
-    try {
-      const response = await fetch("/api/send-preview-packet", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          to: email,
-          serviceName: newlyCreatedService.name,
-          serviceId: newlyCreatedService.id,
-          packetType: "developer",
-          developerGuideHtml: welcomePacket.developerGuideHtml,
-          requestBodyJson: welcomePacket.requestBodyJson,
-          webhookPayloadJson: welcomePacket.webhookPayloadJson,
-          emailPayloadJson: welcomePacket.emailPayloadJson,
-          successExampleJson: welcomePacket.successExampleJson,
-          failureExampleJson: welcomePacket.failureExampleJson,
-        }),
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Non-JSON response:", text.substring(0, 200));
-        throw new Error(
-          `Server returned non-JSON response. Status: ${response.status}`
-        );
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send email");
-      }
-
-      addEvent(
-        "success",
-        "Developer welcome packet sent successfully",
-        `6 files sent to ${email}`,
-        { email, packetType: "developer" }
-      );
-    } catch (error) {
-      console.error("Error sending developer packet:", error);
-      addEvent(
-        "error",
-        "Failed to send developer welcome packet",
-        error instanceof Error ? error.message : "Unknown error"
-      );
-      alert(
-        `Failed to send developer email: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }\n\nYou can still download the files manually.`
-      );
-      throw error;
-    } finally {
-      setIsSendingPacket(false);
-    }
-  };
-
-  const handleSendOpsPacket = async (email: string) => {
-    if (!welcomePacket || !newlyCreatedService) {
-      return;
-    }
-
-    addEvent("progress", "Sending ops team welcome packet...", `To: ${email}`);
-    setIsSendingPacket(true);
-
-    try {
-      const response = await fetch("/api/send-preview-packet", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          to: email,
-          serviceName: newlyCreatedService.name,
-          serviceId: newlyCreatedService.id,
-          packetType: "ops",
-          opsWelcomeGuideHtml: welcomePacket.opsWelcomeGuideHtml,
-          quickStartChecklistHtml: welcomePacket.quickStartChecklistHtml,
-        }),
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Non-JSON response:", text.substring(0, 200));
-        throw new Error(
-          `Server returned non-JSON response. Status: ${response.status}`
-        );
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send email");
-      }
-
-      addEvent(
-        "success",
-        "Ops team welcome packet sent successfully",
-        `2 files sent to ${email}`,
-        { email, packetType: "ops" }
-      );
-
-      // Success - close preview modal and show next steps
-      setIsPreviewPacketOpen(false);
-      setIsNextStepsOpen(true);
-    } catch (error) {
-      console.error("Error sending ops packet:", error);
-      addEvent(
-        "error",
-        "Failed to send ops team welcome packet",
-        error instanceof Error ? error.message : "Unknown error"
-      );
-      alert(
-        `Failed to send ops email: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }\n\nYou can still download the files manually.`
-      );
-      // Still proceed to next steps even if email fails
-      setIsPreviewPacketOpen(false);
-      setIsNextStepsOpen(true);
-    } finally {
-      setIsSendingPacket(false);
-    }
-  };
-
-  const handleViewServiceDetails = () => {
-    if (newlyCreatedService) {
-      router.push(`/services/${newlyCreatedService.id}`);
-      setIsTestRunnerOpen(false);
-      setIsNextStepsOpen(false);
-    }
-  };
-
-  const resetCreateModal = () => {
-    setCreateStep(1);
-    setNewService({ name: "" });
-    setSelectedWorkflows([]);
-    setDestinations([]);
-    setCurrentDestination({ type: "webhook", tokenServiceType: "none" });
-  };
-
-  const handleAddDestination = () => {
-    const isValid =
-      (currentDestination.type === "webhook" && currentDestination.url) ||
-      (currentDestination.type === "email" && currentDestination.email);
-
-    if (!isValid) return;
-
-    const tokenService = buildTokenService(currentDestination);
-
-    setDestinations([
-      ...destinations,
-      {
-        id: `dest-${Date.now()}`,
-        type: currentDestination.type,
-        url: currentDestination.url,
-        email: currentDestination.email,
-        name: currentDestination.name,
-        tokenService,
-      },
-    ]);
-
-    setCurrentDestination({ type: "webhook", tokenServiceType: "none" });
-  };
-
-  const handleRemoveDestination = (id: string) => {
-    setDestinations(destinations.filter((d) => d.id !== id));
+    // Navigate directly to service details
+    router.push(`/services/${newServiceData.id}`);
   };
 
   return (
@@ -695,12 +253,11 @@ function HomeContent() {
               <div className="absolute inset-0 bg-cyan-400/20 blur-xl" />
             </div>
             <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Service Network
+              Snap Verify
             </h1>
           </div>
           <p className="text-slate-400 text-lg max-w-2xl">
-            Orchestrate intelligent verification workflows across distributed
-            systems
+            Identity verification made easy
           </p>
         </div>
 
@@ -729,14 +286,6 @@ function HomeContent() {
               <Sparkles className="h-4 w-4" />
               Quick Start
             </Button>
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              variant="outline"
-              className="flex-1 sm:flex-initial gap-2 border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-400 transition-all duration-300"
-            >
-              <Plus className="h-4 w-4" />
-              Advanced Setup
-            </Button>
           </div>
         </div>
 
@@ -764,7 +313,7 @@ function HomeContent() {
                       workflows
                     </p>
                     <Button
-                      onClick={() => setIsCreateModalOpen(true)}
+                      onClick={() => setIsQuickStartOpen(true)}
                       className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -864,757 +413,6 @@ function HomeContent() {
         </div>
       </main>
 
-      {/* Create Service Modal */}
-      <Dialog
-        open={isCreateModalOpen}
-        onOpenChange={(open) => {
-          setIsCreateModalOpen(open);
-          if (!open) resetCreateModal();
-        }}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
-          <DialogHeader>
-            <DialogTitle className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              Initialize Service
-            </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              {createStep === 1 && "Configure core service parameters"}
-              {createStep === 2 && "Establish connection endpoints"}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Futuristic Step Indicator */}
-          <div className="flex items-center justify-center gap-4 mb-8">
-            <div className="flex items-center gap-3">
-              <div
-                className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  createStep >= 1
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/50"
-                    : "bg-slate-800 text-slate-500 border border-slate-700"
-                }`}
-              >
-                {createStep > 1 ? (
-                  <div className="w-2 h-2 rounded-full bg-white" />
-                ) : (
-                  "1"
-                )}
-              </div>
-              <span
-                className={`text-sm font-medium transition-colors ${
-                  createStep >= 1 ? "text-cyan-400" : "text-slate-500"
-                }`}
-              >
-                Configuration
-              </span>
-            </div>
-            <div
-              className={`h-px flex-1 transition-all duration-300 ${
-                createStep >= 2
-                  ? "bg-gradient-to-r from-cyan-500 to-blue-500"
-                  : "bg-slate-700"
-              }`}
-            />
-            <div className="flex items-center gap-3">
-              <div
-                className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  createStep >= 2
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/50"
-                    : "bg-slate-800 text-slate-500 border border-slate-700"
-                }`}
-              >
-                2
-              </div>
-              <span
-                className={`text-sm font-medium transition-colors ${
-                  createStep >= 2 ? "text-cyan-400" : "text-slate-500"
-                }`}
-              >
-                Connections
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            {/* Step 1: Basic Information */}
-            {createStep === 1 && (
-              <>
-                <div className="space-y-3">
-                  <Label htmlFor="service-name" className="text-slate-300">
-                    Service Identifier
-                  </Label>
-                  <Input
-                    id="service-name"
-                    placeholder="Enter service name"
-                    value={newService.name}
-                    onChange={(e) =>
-                      setNewService({ ...newService, name: e.target.value })
-                    }
-                    className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-yellow-400" />
-                    <Label className="text-slate-300">Workflow Selection</Label>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto rounded-lg bg-slate-800/30 border border-slate-700/50 p-4">
-                    {mockWorkflows.map((workflow) => (
-                      <div
-                        key={workflow.id}
-                        className="flex items-center space-x-3 p-2 rounded-md hover:bg-slate-700/30 transition-colors"
-                      >
-                        <Checkbox
-                          id={workflow.id}
-                          checked={selectedWorkflows.includes(workflow.id)}
-                          onCheckedChange={() =>
-                            handleWorkflowToggle(workflow.id)
-                          }
-                          className="border-slate-600 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
-                        />
-                        <Label
-                          htmlFor={workflow.id}
-                          className="font-normal cursor-pointer text-slate-300 flex-1"
-                        >
-                          {workflow.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {selectedWorkflows.length > 0 && (
-                    <div className="p-4 rounded-lg bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-slate-400">
-                          {selectedWorkflows.length} workflow(s) active
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-slate-300">
-                            Estimated Cost:
-                          </span>
-                          <span className="text-lg font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                            {formatCurrency(calculatedCost)}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        $0.05 per workflow execution
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Step 2: Destination Connection */}
-            {createStep === 2 && (
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Network className="h-5 w-5 text-purple-400" />
-                    <Label className="text-base font-semibold text-slate-300">
-                      Connection Endpoints
-                    </Label>
-                  </div>
-                  <p className="text-sm text-slate-400 mb-4">
-                    Configure webhook and email destinations. Webhooks support
-                    optional token-based authentication.
-                  </p>
-                </div>
-
-                {/* Existing Destinations */}
-                {destinations.length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-                      Active Connections
-                    </Label>
-                    <div className="space-y-2">
-                      {destinations.map((dest) => (
-                        <div
-                          key={dest.id}
-                          className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-cyan-500/30 transition-colors"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30">
-                                  {dest.type === "webhook"
-                                    ? "Webhook"
-                                    : "Email"}
-                                </Badge>
-                                {dest.name && (
-                                  <span className="font-medium text-slate-200">
-                                    {dest.name}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-slate-400 font-mono">
-                                {dest.type === "webhook"
-                                  ? dest.url
-                                  : dest.email}
-                              </p>
-                              {dest.tokenService && (
-                                <p className="text-xs text-purple-400 mt-2">
-                                  Auth:{" "}
-                                  {dest.tokenService.type === "oauth"
-                                    ? "OAuth"
-                                    : "Custom"}
-                                </p>
-                              )}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveDestination(dest.id)}
-                              className="text-slate-400 hover:text-red-400 hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Add New Destination Form */}
-                <div className="rounded-lg bg-slate-800/30 border border-slate-700/50 p-5 space-y-4">
-                  <Label className="text-base font-semibold text-slate-300">
-                    New Connection
-                  </Label>
-
-                  <div className="space-y-3">
-                    <Label className="text-slate-300">Connection Type</Label>
-                    <RadioGroup
-                      value={currentDestination.type}
-                      onValueChange={(value) =>
-                        setCurrentDestination({
-                          ...currentDestination,
-                          type: value as "webhook" | "email",
-                          tokenServiceType:
-                            value === "webhook" ? "none" : undefined,
-                        })
-                      }
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2 flex-1 p-3 rounded-lg border border-slate-700/50 hover:border-cyan-500/50 transition-colors cursor-pointer">
-                        <RadioGroupItem
-                          value="webhook"
-                          id="webhook"
-                          className="border-slate-600 data-[state=checked]:border-cyan-500"
-                        />
-                        <Label
-                          htmlFor="webhook"
-                          className="font-normal cursor-pointer text-slate-300 flex-1"
-                        >
-                          Webhook
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2 flex-1 p-3 rounded-lg border border-slate-700/50 hover:border-cyan-500/50 transition-colors cursor-pointer">
-                        <RadioGroupItem
-                          value="email"
-                          id="email"
-                          className="border-slate-600 data-[state=checked]:border-cyan-500"
-                        />
-                        <Label
-                          htmlFor="email"
-                          className="font-normal cursor-pointer text-slate-300 flex-1"
-                        >
-                          Email
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {currentDestination.type === "webhook" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="webhook-name"
-                          className="text-slate-300"
-                        >
-                          Connection Name (Optional)
-                        </Label>
-                        <Input
-                          id="webhook-name"
-                          placeholder="Production Webhook"
-                          value={currentDestination.name || ""}
-                          onChange={(e) =>
-                            setCurrentDestination({
-                              ...currentDestination,
-                              name: e.target.value,
-                            })
-                          }
-                          className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="webhook-url" className="text-slate-300">
-                          Endpoint URL
-                        </Label>
-                        <Input
-                          id="webhook-url"
-                          type="url"
-                          placeholder="https://api.example.com/webhook"
-                          value={currentDestination.url || ""}
-                          onChange={(e) =>
-                            setCurrentDestination({
-                              ...currentDestination,
-                              url: e.target.value,
-                            })
-                          }
-                          className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100 font-mono text-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label className="text-slate-300">
-                          Authentication (Optional)
-                        </Label>
-                        <RadioGroup
-                          value={currentDestination.tokenServiceType || "none"}
-                          onValueChange={(value) =>
-                            setCurrentDestination({
-                              ...currentDestination,
-                              tokenServiceType: value as
-                                | "none"
-                                | "oauth"
-                                | "custom",
-                            })
-                          }
-                          className="space-y-2"
-                        >
-                          <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-700/30 transition-colors cursor-pointer">
-                            <RadioGroupItem
-                              value="none"
-                              id="token-none"
-                              className="border-slate-600 data-[state=checked]:border-cyan-500"
-                            />
-                            <Label
-                              htmlFor="token-none"
-                              className="font-normal cursor-pointer text-slate-300 flex-1"
-                            >
-                              None
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-700/30 transition-colors cursor-pointer">
-                            <RadioGroupItem
-                              value="oauth"
-                              id="token-oauth"
-                              className="border-slate-600 data-[state=checked]:border-cyan-500"
-                            />
-                            <Label
-                              htmlFor="token-oauth"
-                              className="font-normal cursor-pointer text-slate-300 flex-1"
-                            >
-                              OAuth 2.0
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-700/30 transition-colors cursor-pointer">
-                            <RadioGroupItem
-                              value="custom"
-                              id="token-custom"
-                              className="border-slate-600 data-[state=checked]:border-cyan-500"
-                            />
-                            <Label
-                              htmlFor="token-custom"
-                              className="font-normal cursor-pointer text-slate-300 flex-1"
-                            >
-                              Custom Token Service
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-
-                      {currentDestination.tokenServiceType === "oauth" && (
-                        <div className="space-y-4 rounded-lg border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 p-4">
-                          <Label className="text-sm font-semibold text-cyan-300">
-                            OAuth 2.0 Configuration
-                          </Label>
-                          <div className="space-y-3">
-                            <div>
-                              <Label
-                                htmlFor="oauth-client-id"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Client ID
-                              </Label>
-                              <Input
-                                id="oauth-client-id"
-                                placeholder="your-client-id"
-                                value={
-                                  currentDestination.oauthConfig?.clientId || ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    oauthConfig: {
-                                      ...(currentDestination.oauthConfig || {}),
-                                      clientId: e.target.value,
-                                      clientSecret:
-                                        currentDestination.oauthConfig
-                                          ?.clientSecret || "",
-                                      tokenUrl:
-                                        currentDestination.oauthConfig
-                                          ?.tokenUrl || "",
-                                      scope:
-                                        currentDestination.oauthConfig?.scope ||
-                                        "",
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor="oauth-client-secret"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Client Secret
-                              </Label>
-                              <Input
-                                id="oauth-client-secret"
-                                type="password"
-                                placeholder="your-client-secret"
-                                value={
-                                  currentDestination.oauthConfig
-                                    ?.clientSecret || ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    oauthConfig: {
-                                      ...(currentDestination.oauthConfig || {}),
-                                      clientId:
-                                        currentDestination.oauthConfig
-                                          ?.clientId || "",
-                                      clientSecret: e.target.value,
-                                      tokenUrl:
-                                        currentDestination.oauthConfig
-                                          ?.tokenUrl || "",
-                                      scope:
-                                        currentDestination.oauthConfig?.scope ||
-                                        "",
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor="oauth-token-url"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Token URL
-                              </Label>
-                              <Input
-                                id="oauth-token-url"
-                                type="url"
-                                placeholder="https://auth.example.com/oauth/token"
-                                value={
-                                  currentDestination.oauthConfig?.tokenUrl || ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    oauthConfig: {
-                                      ...(currentDestination.oauthConfig || {}),
-                                      clientId:
-                                        currentDestination.oauthConfig
-                                          ?.clientId || "",
-                                      clientSecret:
-                                        currentDestination.oauthConfig
-                                          ?.clientSecret || "",
-                                      tokenUrl: e.target.value,
-                                      scope:
-                                        currentDestination.oauthConfig?.scope ||
-                                        "",
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100 font-mono text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor="oauth-scope"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Scope (Optional)
-                              </Label>
-                              <Input
-                                id="oauth-scope"
-                                placeholder="read write"
-                                value={
-                                  currentDestination.oauthConfig?.scope || ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    oauthConfig: {
-                                      ...(currentDestination.oauthConfig || {}),
-                                      clientId:
-                                        currentDestination.oauthConfig
-                                          ?.clientId || "",
-                                      clientSecret:
-                                        currentDestination.oauthConfig
-                                          ?.clientSecret || "",
-                                      tokenUrl:
-                                        currentDestination.oauthConfig
-                                          ?.tokenUrl || "",
-                                      scope: e.target.value,
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {currentDestination.tokenServiceType === "custom" && (
-                        <div className="space-y-4 rounded-lg border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-4">
-                          <Label className="text-sm font-semibold text-purple-300">
-                            Custom Token Service
-                          </Label>
-                          <div className="space-y-3">
-                            <div>
-                              <Label
-                                htmlFor="custom-client-id"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Client ID
-                              </Label>
-                              <Input
-                                id="custom-client-id"
-                                placeholder="your-client-id"
-                                value={
-                                  currentDestination.customConfig?.clientId ||
-                                  ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    customConfig: {
-                                      ...(currentDestination.customConfig ||
-                                        {}),
-                                      clientId: e.target.value,
-                                      tokenServiceUrl:
-                                        currentDestination.customConfig
-                                          ?.tokenServiceUrl || "",
-                                      headerName:
-                                        currentDestination.customConfig
-                                          ?.headerName || "",
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-purple-500/50 focus:ring-purple-500/20 text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor="custom-token-service-url"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Token Service URL
-                              </Label>
-                              <Input
-                                id="custom-token-service-url"
-                                type="url"
-                                placeholder="https://api.example.com/token"
-                                value={
-                                  currentDestination.customConfig
-                                    ?.tokenServiceUrl || ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    customConfig: {
-                                      ...(currentDestination.customConfig ||
-                                        {}),
-                                      clientId:
-                                        currentDestination.customConfig
-                                          ?.clientId || "",
-                                      tokenServiceUrl: e.target.value,
-                                      headerName:
-                                        currentDestination.customConfig
-                                          ?.headerName || "",
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-purple-500/50 focus:ring-purple-500/20 text-slate-100 font-mono text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor="custom-header-name"
-                                className="text-xs text-slate-400 mb-1 block"
-                              >
-                                Header Name
-                              </Label>
-                              <Input
-                                id="custom-header-name"
-                                placeholder="X-Client-Id"
-                                value={
-                                  currentDestination.customConfig?.headerName ||
-                                  ""
-                                }
-                                onChange={(e) =>
-                                  setCurrentDestination({
-                                    ...currentDestination,
-                                    customConfig: {
-                                      ...(currentDestination.customConfig ||
-                                        {}),
-                                      clientId:
-                                        currentDestination.customConfig
-                                          ?.clientId || "",
-                                      tokenServiceUrl:
-                                        currentDestination.customConfig
-                                          ?.tokenServiceUrl || "",
-                                      headerName: e.target.value,
-                                    },
-                                  })
-                                }
-                                className="bg-slate-800/50 border-slate-700/50 focus:border-purple-500/50 focus:ring-purple-500/20 text-slate-100"
-                              />
-                              <p className="text-xs text-slate-500 mt-1">
-                                Header name to send client ID when requesting
-                                token
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {currentDestination.type === "email" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="email-name" className="text-slate-300">
-                          Connection Name (Optional)
-                        </Label>
-                        <Input
-                          id="email-name"
-                          placeholder="Admin Email"
-                          value={currentDestination.name || ""}
-                          onChange={(e) =>
-                            setCurrentDestination({
-                              ...currentDestination,
-                              name: e.target.value,
-                            })
-                          }
-                          className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="email-address"
-                          className="text-slate-300"
-                        >
-                          Email Address
-                        </Label>
-                        <Input
-                          id="email-address"
-                          type="email"
-                          placeholder="recipient@example.com"
-                          value={currentDestination.email || ""}
-                          onChange={(e) =>
-                            setCurrentDestination({
-                              ...currentDestination,
-                              email: e.target.value,
-                            })
-                          }
-                          className="bg-slate-800/50 border-slate-700/50 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddDestination}
-                    disabled={
-                      (currentDestination.type === "webhook" &&
-                        !currentDestination.url) ||
-                      (currentDestination.type === "email" &&
-                        !currentDestination.email)
-                    }
-                    className="w-full border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-400 transition-all"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Connection
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                resetCreateModal();
-              }}
-              className="border-slate-700/50 hover:border-slate-600 text-slate-300"
-            >
-              Cancel
-            </Button>
-            <div className="flex gap-2">
-              {createStep > 1 && (
-                <Button
-                  variant="outline"
-                  onClick={() => setCreateStep(createStep - 1)}
-                  className="border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-400"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Previous
-                </Button>
-              )}
-              {createStep < 2 ? (
-                <Button
-                  onClick={() => {
-                    if (createStep === 1) {
-                      if (!newService.name || selectedWorkflows.length === 0) {
-                        return;
-                      }
-                    }
-                    setCreateStep(createStep + 1);
-                  }}
-                  disabled={
-                    createStep === 1 &&
-                    (!newService.name || selectedWorkflows.length === 0)
-                  }
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white border-0 shadow-lg shadow-cyan-500/25 disabled:opacity-50"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleCreateService}
-                  disabled={
-                    !newService.name ||
-                    selectedWorkflows.length === 0 ||
-                    destinations.length === 0
-                  }
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white border-0 shadow-lg shadow-cyan-500/25 disabled:opacity-50"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Initialize Service
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Onboarding Modal */}
       <OnboardingModal
         open={isOnboardingOpen}
@@ -1625,91 +423,13 @@ function HomeContent() {
         }}
       />
 
-      {/* Transition Overlay - maintains backdrop during modal transition */}
-      {isTransitioning && (
-        <div className="fixed inset-0 z-[45] bg-black/80 modal-transition-overlay" />
-      )}
-
       {/* Quick Start Modal */}
       <QuickStartModal
         open={isQuickStartOpen}
-        onOpenChange={(open) => {
-          setIsQuickStartOpen(open);
-          if (!open) setIsTransitioning(false);
-        }}
+        onOpenChange={setIsQuickStartOpen}
         onCreate={handleQuickStartCreate}
         isCreating={isCreatingService}
       />
-
-      {/* Welcome Packet Modal */}
-      <PreviewPacketModal
-        open={isPreviewPacketOpen}
-        onOpenChange={(open) => {
-          setIsPreviewPacketOpen(open);
-          if (!open) setIsTransitioning(false);
-        }}
-        initialEmail={previewEmail}
-        previewPacket={welcomePacket}
-        onSendDeveloper={handleSendDeveloperPacket}
-        onSendOps={handleSendOpsPacket}
-        isSending={isSendingPacket}
-      />
-
-      {/* Test Runner Modal */}
-      {newlyCreatedService && (
-        <TestRunner
-          open={isTestRunnerOpen}
-          onOpenChange={setIsTestRunnerOpen}
-          service={newlyCreatedService}
-          onEvent={addEvent}
-          onDone={() => {
-            setCompletedSteps((prev) => new Set(prev).add("runTest"));
-            setIsTestRunnerOpen(false);
-            setIsNextStepsOpen(true);
-          }}
-        />
-      )}
-
-      {/* Next Steps Modal */}
-      {newlyCreatedService && (
-        <Dialog open={isNextStepsOpen} onOpenChange={setIsNextStepsOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
-            <DialogHeader>
-              <DialogTitle className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                Service Created Successfully!
-              </DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Your welcome packet has been sent. Here&apos;s what to do next.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6">
-              <NextStepsCard
-                emailAddress={previewEmail}
-                onRunTest={() => {
-                  setIsNextStepsOpen(false);
-                  setIsTestRunnerOpen(true);
-                }}
-                onSetupWebhooks={() => {
-                  setIsNextStepsOpen(false);
-                  handleViewServiceDetails();
-                }}
-                completedSteps={completedSteps}
-              />
-              <div className="p-4 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
-                <p className="text-sm text-slate-400">
-                  <strong className="text-slate-300">Trial Credits:</strong> You
-                  have{" "}
-                  <strong className="text-yellow-400">
-                    ${trialCredits.toFixed(2)}
-                  </strong>{" "}
-                  in free trial credits (approximately{" "}
-                  {Math.floor(trialCredits / 0.1)} test runs remaining).
-                </p>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 }

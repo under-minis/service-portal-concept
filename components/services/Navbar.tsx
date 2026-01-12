@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Sparkles, Activity, RotateCcw } from "lucide-react";
+import { Activity, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
@@ -27,13 +27,13 @@ export function Navbar() {
         {pathname === "/" ? (
           <div className="flex items-center gap-2 cursor-default">
             <h1 className="text-xl font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              Under Minis Onboarding Concept
+              NON TECHNICAL (persona concept)
             </h1>
           </div>
         ) : (
           <Link href="/" className="flex items-center gap-2">
             <h1 className="text-xl font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              Under Minis Onboarding Concept
+              NON TECHNICAL (persona concept)
             </h1>
           </Link>
         )}
@@ -66,7 +66,7 @@ export function Navbar() {
           >
             <Link href="/events" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Logs
+              Reports
             </Link>
           </Button>
           <Button
