@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +32,14 @@ import { mockServices } from "@/data/mockServices";
 import { mockWorkflows } from "@/data/mockWorkflows";
 import { formatCurrency } from "@/lib/utils/formatting";
 import { calculateCostPerRun } from "@/lib/utils/costCalculation";
+import { OnboardingModal } from "@/components/services/OnboardingModal";
+import { QuickStartModal } from "@/components/services/QuickStartModal";
+import { PreviewPacketModal } from "@/components/services/PreviewPacketModal";
+import { TestRunner } from "@/components/services/TestRunner";
+import { NextStepsCard } from "@/components/services/NextStepsCard";
+import { TrialCreditsDisplay } from "@/components/services/TrialCreditsDisplay";
+import { generatePreviewPacket } from "@/lib/utils/previewPacketGenerator";
+import type { PreviewPacket } from "@/lib/utils/previewPacketGenerator";
 
 type Destination = {
   id: string;
@@ -76,6 +84,7 @@ type CurrentDestination = {
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [services, setServices] = useState<Service[]>(mockServices);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>([]);
@@ -87,6 +96,48 @@ export default function Home() {
       type: "webhook",
       tokenServiceType: "none",
     });
+
+  // New state for onboarding flow
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isQuickStartOpen, setIsQuickStartOpen] = useState(false);
+  const [isPreviewPacketOpen, setIsPreviewPacketOpen] = useState(false);
+  const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
+  const [isNextStepsOpen, setIsNextStepsOpen] = useState(false);
+  const [previewPacket, setPreviewPacket] = useState<PreviewPacket | null>(
+    null
+  );
+  const [previewEmail, setPreviewEmail] = useState("");
+  const [isSendingPacket, setIsSendingPacket] = useState(false);
+  const [newlyCreatedService, setNewlyCreatedService] =
+    useState<Service | null>(null);
+  const [trialCredits, setTrialCredits] = useState(50);
+
+  // Check for onboarding URL param and first-time user
+  useEffect(() => {
+    const checkOnboarding = () => {
+      try {
+        const forceOnboarding = searchParams?.get("onboarding") === "true";
+        const skipOnboarding =
+          localStorage.getItem("skipOnboarding") === "true";
+        const isFirstTime = services.length === 0;
+
+        if ((isFirstTime && !skipOnboarding) || forceOnboarding) {
+          // Use setTimeout to avoid synchronous setState in effect
+          setTimeout(() => setIsOnboardingOpen(true), 0);
+        }
+      } catch {
+        // Handle case where searchParams might not be available
+        const skipOnboarding =
+          localStorage.getItem("skipOnboarding") === "true";
+        const isFirstTime = services.length === 0;
+        if (isFirstTime && !skipOnboarding) {
+          setTimeout(() => setIsOnboardingOpen(true), 0);
+        }
+      }
+    };
+
+    checkOnboarding();
+  }, [searchParams, services.length]);
 
   const calculatedCost = useMemo(
     () => calculateCostPerRun(selectedWorkflows.length),
@@ -185,6 +236,113 @@ export default function Home() {
     resetCreateModal();
   };
 
+  // Quick Start handlers
+  const handleQuickStartCreate = (serviceName: string, email: string) => {
+    const baseIndex = services.length + 1;
+    const defaultWorkflows = ["wf-001", "wf-002"]; // Email + Phone Verification
+    const defaultWorkflowNames = mockWorkflows
+      .filter((wf) => defaultWorkflows.includes(wf.id))
+      .map((wf) => wf.name);
+    const defaultCost = calculateCostPerRun(defaultWorkflows.length);
+
+    // Create email destination
+    const emailDestination = {
+      id: `email-${baseIndex}-0`,
+      email: email,
+      name: `${serviceName} Email`,
+      createdAt: new Date().toISOString(),
+    };
+
+    const newServiceData: Service = {
+      id: `svc-${String(baseIndex).padStart(3, "0")}`,
+      name: serviceName,
+      workflowNames: defaultWorkflowNames,
+      estimatedCostPerRun: defaultCost,
+      emailDestinations: [emailDestination],
+      tokenConnections: [],
+    };
+
+    // Generate preview packet
+    const packet = generatePreviewPacket(newServiceData, email);
+    setPreviewPacket(packet);
+    setPreviewEmail(email);
+    setNewlyCreatedService(newServiceData);
+
+    // Add service to list
+    setServices([...services, newServiceData]);
+
+    // Close quick start, open preview packet modal
+    setIsQuickStartOpen(false);
+    setIsPreviewPacketOpen(true);
+  };
+
+  const handleSendPreviewPacket = async () => {
+    if (!previewPacket || !newlyCreatedService) {
+      return;
+    }
+
+    setIsSendingPacket(true);
+
+    try {
+      const response = await fetch("/api/send-preview-packet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: previewEmail,
+          serviceName: newlyCreatedService.name,
+          serviceId: newlyCreatedService.id,
+          html: previewPacket.html,
+          requestBodyJson: previewPacket.requestBodyJson,
+          webhookPayloadJson: previewPacket.webhookPayloadJson,
+          emailPayloadJson: previewPacket.emailPayloadJson,
+        }),
+      });
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response:", text.substring(0, 200));
+        throw new Error(
+          `Server returned non-JSON response. Status: ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send email");
+      }
+
+      // Success - close preview modal and show next steps
+      setIsPreviewPacketOpen(false);
+      setIsNextStepsOpen(true);
+    } catch (error) {
+      console.error("Error sending preview packet:", error);
+      // Show error but still allow user to proceed
+      alert(
+        `Failed to send email: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }\n\nYou can still download the files manually.`
+      );
+      // Still proceed to next steps even if email fails
+      setIsPreviewPacketOpen(false);
+      setIsNextStepsOpen(true);
+    } finally {
+      setIsSendingPacket(false);
+    }
+  };
+
+  const handleViewServiceDetails = () => {
+    if (newlyCreatedService) {
+      router.push(`/services/${newlyCreatedService.id}`);
+      setIsTestRunnerOpen(false);
+      setIsNextStepsOpen(false);
+    }
+  };
+
   const resetCreateModal = () => {
     setCreateStep(1);
     setNewService({ name: "" });
@@ -274,14 +432,25 @@ export default function Home() {
                 {services.reduce((acc, s) => acc + s.workflowNames.length, 0)}
               </span>
             </div>
+            <TrialCreditsDisplay credits={trialCredits} />
           </div>
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white border-0 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-all duration-300"
-          >
-            <Plus className="h-4 w-4" />
-            Initialize Service
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setIsQuickStartOpen(true)}
+              className="gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white border-0 shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transition-all duration-300"
+            >
+              <Sparkles className="h-4 w-4" />
+              Quick Start
+            </Button>
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              variant="outline"
+              className="gap-2 border-slate-700/50 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-400 transition-all duration-300"
+            >
+              <Plus className="h-4 w-4" />
+              Advanced Setup
+            </Button>
+          </div>
         </div>
 
         {/* Services Grid */}
@@ -1146,6 +1315,95 @@ export default function Home() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        open={isOnboardingOpen}
+        onOpenChange={setIsOnboardingOpen}
+        onGetStarted={() => {
+          setIsOnboardingOpen(false);
+          setIsQuickStartOpen(true);
+        }}
+      />
+
+      {/* Quick Start Modal */}
+      <QuickStartModal
+        open={isQuickStartOpen}
+        onOpenChange={setIsQuickStartOpen}
+        onCreate={handleQuickStartCreate}
+        isCreating={false}
+      />
+
+      {/* Preview Packet Modal */}
+      <PreviewPacketModal
+        open={isPreviewPacketOpen}
+        onOpenChange={setIsPreviewPacketOpen}
+        emailAddress={previewEmail}
+        previewPacket={previewPacket}
+        onSend={handleSendPreviewPacket}
+        isSending={isSendingPacket}
+      />
+
+      {/* Test Runner Modal */}
+      {newlyCreatedService && (
+        <TestRunner
+          open={isTestRunnerOpen}
+          onOpenChange={setIsTestRunnerOpen}
+          service={newlyCreatedService}
+          onViewDetails={handleViewServiceDetails}
+        />
+      )}
+
+      {/* Next Steps Modal */}
+      {newlyCreatedService && (
+        <Dialog open={isNextStepsOpen} onOpenChange={setIsNextStepsOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
+            <DialogHeader>
+              <DialogTitle className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                Service Created Successfully!
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Your preview packet has been sent. Here&apos;s what to do next.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <NextStepsCard
+                emailAddress={previewEmail}
+                onRunTest={() => {
+                  setIsNextStepsOpen(false);
+                  setIsTestRunnerOpen(true);
+                }}
+                onViewDetails={handleViewServiceDetails}
+                onSetupWebhooks={() => {
+                  handleViewServiceDetails();
+                }}
+              />
+              <div className="p-4 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
+                <p className="text-sm text-slate-400">
+                  <strong className="text-slate-300">Trial Credits:</strong> You
+                  have{" "}
+                  <strong className="text-yellow-400">
+                    ${trialCredits.toFixed(2)}
+                  </strong>{" "}
+                  in free trial credits (approximately{" "}
+                  {Math.floor(trialCredits / 0.1)} test runs remaining).
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  setIsNextStepsOpen(false);
+                  setNewlyCreatedService(null);
+                }}
+                className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white border-0"
+              >
+                Continue to Dashboard
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
