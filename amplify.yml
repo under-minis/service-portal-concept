@@ -6,13 +6,23 @@ frontend:
         - corepack enable
         - corepack prepare pnpm@10.15.1 --activate
         - pnpm install --frozen-lockfile
+
+        # --- Inject Amplify env vars into Next.js ---
+        - rm -f .env.production
+        - touch .env.production
+
+        - echo "RESEND_API_KEY=$RESEND_API_KEY" >> .env.production
+        - echo "RESEND_FROM_EMAIL=$RESEND_FROM_EMAIL" >> .env.production
+
     build:
       commands:
         - pnpm build
+
   artifacts:
     baseDirectory: .next
     files:
       - "**/*"
+
   cache:
     paths:
       - node_modules/**/*
